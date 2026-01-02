@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"; // 工具函数，shadcn 自带的
 
 import { useQuery } from "convex/react"; // 1. 引入 useQuery
 import { api } from "../../../../convex/_generated/api"; // 2. 引入 api 定义
-import { useDebounce } from "@/hooks/use-debounce"; // 3. 引入防抖 hook
+import { useDebounce } from "../api/use-debounce"; // 3. 引入防抖 hook
 
 interface SignUpCardProps {
   setState: (state: SignInFlow) => void;

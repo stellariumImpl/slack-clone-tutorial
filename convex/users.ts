@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { auth } from "./auth";
 
 export const checkEmailUnique = query({
   args: { email: v.string() },
@@ -13,5 +14,18 @@ export const checkEmailUnique = query({
     // 如果查到了 user，返回 true (代表邮箱已存在)
     // 如果没查到，返回 false
     return !!user;
+  },
+});
+
+export const current = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await auth.getUserId(ctx);
+
+    if (userId == null) {
+      return null;
+    }
+
+    return await ctx.db.get(userId);
   },
 });
