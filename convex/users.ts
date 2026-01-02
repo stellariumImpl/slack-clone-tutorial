@@ -7,7 +7,7 @@ export const checkEmailUnique = query({
     // 使用我们在 schema 里定义的索引来快速查询
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("email", (q) => q.eq("email", args.email))
       .unique();
 
     // 如果查到了 user，返回 true (代表邮箱已存在)

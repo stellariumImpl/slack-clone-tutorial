@@ -53,14 +53,16 @@ export const SignInCard = ({ setState }: SignInCardProps) => {
   const handleProviderSignIn = (value: "github" | "google") => {
     setPending(true);
     // --- 修改：去掉.finally ---
-    // 如果成功页面会跳转，用户永远不需要看到按钮变回原样
-    // 只有当明确报错时（.catch），我们才需要在那里手动setPending(false)，但一般 redirect 很少在前端直接报错。
-
     // signIn(value).finally(() => {
     //   setPending(false);
     // });
 
-    signIn(value);
+    signIn(value).catch((error) => {
+      // 新增：捕获错误
+      console.error("OAuth Error:", error);
+      setError("Something went wrong, please try again.");
+      setPending(false);
+    });
   };
 
   return (

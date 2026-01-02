@@ -26,6 +26,7 @@ interface SignUpCardProps {
 }
 
 export const SignUpCard = ({ setState }: SignUpCardProps) => {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -105,7 +106,7 @@ export const SignUpCard = ({ setState }: SignUpCardProps) => {
       return;
     }
     setPending(true);
-    signIn("password", { email, password, flow: "signUp" })
+    signIn("password", { name, email, password, flow: "signUp" })
       .catch(() => {
         setError("Something went wrong");
       })
@@ -119,7 +120,12 @@ export const SignUpCard = ({ setState }: SignUpCardProps) => {
     // signIn(value).finally(() => {
     //   setPending(false);
     // });
-    signIn(value);
+    signIn(value).catch((error) => {
+      // 新增：只有报错了才停止转圈，并打印错误
+      console.error("OAuth Error:", error);
+      setError("Something went wrong, please try again."); // 给用户一个提示
+      setPending(false);
+    });
   };
 
   return (
@@ -199,8 +205,11 @@ export const SignUpCard = ({ setState }: SignUpCardProps) => {
                 className={cn(
                   "h-10",
                   // 如果邮箱已存在，输入框边框变红
+                  // 修改点 1：加上 && !pending
+                  // 只有在非提交状态下，才显示红色边框
                   existingUser === true &&
                     !isCheckingEmail &&
+                    !pending &&
                     "border-destructive focus-visible:ring-destructive"
                 )}
               />
@@ -208,21 +217,32 @@ export const SignUpCard = ({ setState }: SignUpCardProps) => {
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
                 {isCheckingEmail ? (
                   <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                ) : existingUser === true ? (
+                ) : existingUser === true && !pending ? ( // 修改点 2：加上 && !pending
                   // 邮箱已被占用
+                  // 只有在非提交状态下，才显示红叉
                   <XCircle className="size-4 text-destructive" />
                 ) : null}
               </div>
             </div>
 
-            {/* 邮箱下方的文字提示 (可选，为了更清晰) */}
-            {existingUser === true && !isCheckingEmail && (
+            {/* 修改点 3：加上 && !pending */}
+            {/* 只有在非提交状态下，才显示文字报错 */}
+            {existingUser === true && !isCheckingEmail && !pending && (
               <p className="text-xs text-destructive font-medium text-right">
                 Email already in use
               </p>
             )}
           </div>
           {/* 修改结束 */}
+
+          <Input
+            disabled={pending}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nickname"
+            required
+            className="h-10"
+          />
 
           <Input
             disabled={pending}
