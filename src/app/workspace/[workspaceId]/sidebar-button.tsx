@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils";
 
 interface SidebarButtonProps {
   icon: LucideIcon | IconType;
-  label: string;
+  //   label: string;
   isActive?: boolean;
 }
 
 export const SidebarButton = ({
   icon: Icon,
-  label,
+  //   label,
   isActive,
 }: SidebarButtonProps) => {
   return (
@@ -22,7 +22,7 @@ export const SidebarButton = ({
         variant="transparent"
         className={cn(
           "size-9 p-2 group-hover:bg-accent/20",
-          isActive ? "bg-accent/20" : "bg-transparent"
+          isActive && "bg-accent/20"
         )}
       >
         <Icon
@@ -32,14 +32,15 @@ export const SidebarButton = ({
           )}
         />
       </Button>
-      <span
+      {/* <span
         className={cn(
           "text-[11px] group-hover:text-accent transition-colors",
-          isActive ? "text-white font-bold" : "text-white/70"
+          //   isActive ? "text-white font-bold" : "text-white/70"
+          isActive ? "text-white font-bold" : "text-white"
         )}
       >
         {label}
-      </span>
+      </span> */}
     </div>
   );
 };
