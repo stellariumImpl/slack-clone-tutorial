@@ -3,11 +3,10 @@ import WorkspaceSwitcher from "./workspace-switcher";
 import { SidebarButton } from "./sidebar-button";
 import { Home, MessageSquare, Bell, MoreHorizontal } from "lucide-react";
 import { usePathname } from "next/navigation";
-
 export const Sidebar = () => {
   const pathname = usePathname();
   return (
-    <aside className="w-[60px] shrink-0 h-full bg-[#5D33A8] flex flex-col gap-y-4 items-center pt-[9px] pb-4">
+    <aside className="w-[60px] shrink-0 h-full bg-[#5d33a8] flex flex-col gap-y-4 items-center pt-[9px] pb-4">
       <WorkspaceSwitcher />
       <SidebarButton icon={Home} isActive={pathname.includes("/workspace")} />
 

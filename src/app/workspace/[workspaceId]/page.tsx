@@ -23,7 +23,7 @@ const WorkspaceIdPage = () => {
   const workspaceId = useWorkspaceId();
   const { data } = useGetWorkspace({ id: workspaceId });
   return (
-    <div>
+    <div className="bg-[#2bbf46] h-full">
       WorkspaceIdPage
       <div>Data:{JSON.stringify(data)}</div>
     </div>

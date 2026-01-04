@@ -8,7 +8,7 @@ export const Toolbar = () => {
   const { data } = useGetWorkspace({ id: workspaceId });
   return (
     <div>
-      <nav className="bg-[#5D33A8] flex items-center justify-between h-11.5 p-1.5">
+      <nav className="bg-[#5d33a8] flex items-center justify-between h-13 p-1.5 border-b border-white/10">
         <div className="flex-1" />
         <div className="min-w-0 w-full max-w-[640px] grow shrink px-2">
           <Button
@@ -29,7 +29,7 @@ export const Toolbar = () => {
             size="iconSm"
             className="text-white/70 hover:text-white hover:bg-accent/20"
           >
-            <Info className="size-5" />
+            <Info className="size-6" />
           </Button>
         </div>
       </nav>
