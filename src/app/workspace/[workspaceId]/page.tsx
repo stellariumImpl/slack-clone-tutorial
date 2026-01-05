@@ -91,8 +91,8 @@ const WorkspaceIdPage = () => {
   return (
     <div className="h-full flex flex-col items-center justify-center bg-[#5d33a8]">
       <div className="flex flex-col items-center gap-4">
-        <TriangleAlert className="size-6 text-white" />
-        <span className="text-sm text-white">No channel found</span>
+        <TriangleAlert className="size-6 text-white/80" />
+        <span className="text-sm text-white/80">No channel found</span>
       </div>
     </div>
   );
