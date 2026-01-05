@@ -1,3 +1,5 @@
+import { useRouter } from "next/navigation";
+
 import { Input } from "@/components/ui/input";
 import { useCreateChannelModal } from "../store/use-create-channel-modal";
 import {
@@ -11,8 +13,10 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useCreateChannel } from "../api/use-create-channel";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
+import { toast } from "sonner";
 
 export const CreateChannelModal = () => {
+  const router = useRouter();
   const workspaceId = useWorkspaceId();
   const [open, setOpen] = useCreateChannelModal();
 
@@ -36,12 +40,14 @@ export const CreateChannelModal = () => {
       { name, workspaceId },
       {
         onSuccess: (id) => {
-          // TODO：重定向到那个channel
-
+          // TODO：重定向到那个channel 实现中->已实现
+          toast.success("Channel created");
+          router.replace(`/workspace/${workspaceId}/channel/${id}`);
           handleClose();
         },
-        onError: (error) => {
-          console.error(error);
+        // 防止客户以访客身份加入某个workspace，此时后端数据库刚好又删除了所有的channel，由于workspace至少得有一个channel，但此时又无创建权限，将陷入死循环
+        onError: () => {
+          toast.error("Failed to create channel");
         },
       }
     );
