@@ -22,6 +22,8 @@ const schema = defineSchema({
     name: v.string(),
     userId: v.id("users"),
     joinCode: v.string(),
+    // 新增：记录上次更新时间
+    joinCodeUpdatedAt: v.optional(v.number()),
   }),
 
   members: defineTable({

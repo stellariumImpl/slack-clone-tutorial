@@ -31,67 +31,110 @@ export const InviteModal = ({
   const workspaceId = useWorkspaceId();
   const { mutate, isPending } = useNewJoinCode();
 
-  // 倒计时状态，默认30秒
+  // 1. 自动刷新倒计时 (30s)
   const [timeLeft, setTimeLeft] = useState(30);
-  // 专门用于追踪“手动点击”的状态，以此来控制图标是否旋转
+  // 2. 控制图标旋转
   const [isManualLoading, setIsManualLoading] = useState(false);
 
-  // 新增：冷却状态，防止连点 (Rate Limiting State)
+  // 3. 点击次数计数
+  const [clickCount, setClickCount] = useState(0);
+  // 4. 是否触发了“冷却惩罚”
   const [isRateLimited, setIsRateLimited] = useState(false);
+  // 5. 新增：惩罚倒计时 (默认10秒)
+  const [cooldownTimer, setCooldownTimer] = useState(10);
 
-  // 核心逻辑：倒计时与自动刷新
+  // ------------------------------------------------------------
+  // 逻辑 A: 自动刷新 (Authenticator 模式)
+  // ------------------------------------------------------------
   useEffect(() => {
-    // 如果模态框没打开，就不跑定时器，节省性能
     if (!open) return;
-
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          // 倒计时结束：触发自动更新
-          // 注意：这里没有设置 isManualLoading，所以图标不会转
           mutate(
             { workspaceId },
             {
-              onSuccess: () => {
-                // 自动刷新成功，通常不需要弹 toast 打扰用户，或者可以弹一个很轻的
-                // toast.success("Code auto-refreshed");
+              onSuccess: () => {},
+              onError: (error) => {
+                // 忽略 Too fast 错误
+                if (
+                  error.message !==
+                  "You are doing that too fast. Please wait a moment."
+                ) {
+                  console.error("Auto update failed:", error);
+                }
               },
             }
           );
-          return 30; // 重置回 30 秒
+          return 30;
         }
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
-  }, [open, workspaceId, mutate]); // 依赖项
+  }, [open, workspaceId, mutate]);
 
-  // 手动刷新处理函数
+  // ------------------------------------------------------------
+  // 逻辑 B: 冷却惩罚倒计时 (动态 10s -> 0s)
+  // ------------------------------------------------------------
+  useEffect(() => {
+    // 只有在触发限制时才运行这个计时器
+    if (isRateLimited) {
+      const timer = setInterval(() => {
+        setCooldownTimer((prev) => {
+          if (prev <= 1) {
+            // 倒计时结束：解除锁定，重置状态
+            setIsRateLimited(false);
+            setClickCount(0);
+            return 10; // 重置回 10 供下次使用
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [isRateLimited]);
+
+  // ------------------------------------------------------------
+  // 逻辑 C: 3秒无操作自动清除点击次数
+  // ------------------------------------------------------------
+  useEffect(() => {
+    if (clickCount > 0 && clickCount < 3 && !isRateLimited) {
+      const timer = setTimeout(() => {
+        setClickCount(0);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [clickCount, isRateLimited]);
+
   const handleNewJoinCode = () => {
-    // 新增：检查如果正在冷却中，直接返回，不执行后续逻辑
     if (isRateLimited) return;
-    setIsManualLoading(true); // 1. 标记为手动加载，开始旋转
 
-    // 新增：上锁，开启冷却
-    setIsRateLimited(true);
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
 
+    // 触发惩罚
+    if (newCount >= 3) {
+      setIsRateLimited(true);
+      setCooldownTimer(10); // 确保从 10 开始倒数
+      toast.error("You are doing that too fast. Please wait 10s.");
+      // 注意：这里不再需要 setTimeout，上面的 useEffect 会负责倒计时和解锁
+    }
+
+    setIsManualLoading(true);
     mutate(
       { workspaceId },
       {
         onSuccess: () => {
           toast.success("New join code generated");
-          setTimeLeft(30); // 2. 手动刷新后，重置倒计时
+          setTimeLeft(30);
         },
         onError: () => {
           toast.error("Failed to generate new join code");
         },
         onSettled: () => {
-          setIsManualLoading(false); // 3. 结束旋转
-          // 新增：解锁，10秒后才能再次点击
-          setTimeout(() => {
-            setIsRateLimited(false);
-          }, 10000);
+          setIsManualLoading(false);
         },
       }
     );
@@ -111,7 +154,9 @@ export const InviteModal = ({
           <DialogTitle className="font-bold text-lg">Invite People</DialogTitle>
           <DialogDescription className="text-gray-500">
             Use the code and link below to invite people to{" "}
-            <span className="text-black font-semibold">{name}</span>
+            <span className="text-black font-semibold inline-block max-w-[100px] align-bottom truncate">
+              {name}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
@@ -134,7 +179,6 @@ export const InviteModal = ({
               {joinCode}
             </p>
 
-            {/* 显示倒计时提示 */}
             <div className="flex items-center gap-x-2 mt-1">
               <div className="size-2 rounded-full bg-green-500 animate-pulse" />
               <p className="text-xs text-muted-foreground">
@@ -145,22 +189,22 @@ export const InviteModal = ({
 
           <div className="flex items-center justify-between w-full">
             <Button
-              // 新增：禁用条件，正在请求中 OR 正在冷却中
               disabled={isPending || isRateLimited}
               onClick={handleNewJoinCode}
               variant="outline"
               className="cursor-pointer border-gray-200 text-gray-600 hover:bg-gray-50 w-full"
             >
-              {/* 新增：给用户一点文字反馈，告诉他为什么要等 */}
-              {isRateLimited ? "Please wait..." : "New Code"}
-              <RefreshCcw
-                className={cn(
-                  "size-4 ml-2",
-                  // 只有在手动触发时 (isManualLoading) 才加 animate-spin
-                  // 自动触发虽然也会导致 isPending 变 true，但 isManualLoading 还是 false
-                  isManualLoading && "animate-spin"
-                )}
-              />
+              {/* 动态显示 cooldownTimer */}
+              {isRateLimited ? `Wait ${cooldownTimer}s` : "New Code"}
+
+              {!isRateLimited && (
+                <RefreshCcw
+                  className={cn(
+                    "size-4 ml-2",
+                    isManualLoading && "animate-spin"
+                  )}
+                />
+              )}
             </Button>
           </div>
         </div>

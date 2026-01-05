@@ -93,7 +93,9 @@ export const PreferencesModal = ({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="p-0 bg-white overflow-hidden max-w-md gap-0 text-black">
           <DialogHeader className="p-6 bg-gray-50 border-b border-gray-100">
-            <DialogTitle className="font-bold text-lg">{value}</DialogTitle>
+            <DialogTitle className="font-bold text-lg inline-block max-w-[330px] truncate align-bottom">
+              {value}
+            </DialogTitle>
             <DialogDescription className="text-gray-500">
               Manage your workspace settings and preferences.
             </DialogDescription>
@@ -111,7 +113,9 @@ export const PreferencesModal = ({
                       Edit
                     </p>
                   </div>
-                  <p className="text-sm text-gray-600">{value}</p>
+                  <p className="text-sm text-gray-600 inline-block max-w-[330px] truncate align-bottom">
+                    {value}
+                  </p>
                 </div>
               </DialogTrigger>
 
