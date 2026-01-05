@@ -37,7 +37,7 @@ export default function Home() {
       {/* 中间的加载/欢迎元素 */}
       <div className="flex flex-col items-center gap-4">
         {/* 只有在 isLoading 时转圈，或者一直转圈作为装饰也可以 */}
-        <Loader2 className="size-10 text-white animate-spin text-muted-foreground/50" />
+        <Loader2 className="size-10 text-white animate-spin" />
 
         <p className="text-white font-bold text-lg tracking-wide opacity-80">
           Setting up your workspace...
