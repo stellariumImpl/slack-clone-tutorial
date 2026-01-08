@@ -63,6 +63,8 @@ const Editor = ({
         placeholder,
       }),
     ],
+    // 修改：初始化时根据 disabled 设置是否可编辑
+    editable: !disabled,
     content: defaultValue as any,
     editorProps: {
       attributes: {
@@ -76,6 +78,13 @@ const Editor = ({
           return false;
         }
         if (event.key === "Enter" && !event.shiftKey) {
+          //如果按的是回车，并且当前正在列表里，就不发送，而是执行换行
+          const isList =
+            editor?.isActive("bulletList") || editor?.isActive("orderedList");
+          if (isList) {
+            return false; // 返回 false，让 Tiptap 执行默认的“新增列表项”行为
+          }
+
           event.preventDefault();
           const text = editor?.getText();
           // 修改：逻辑判断：检查数组长度
@@ -114,7 +123,15 @@ const Editor = ({
     immediatelyRender: false,
   });
 
-  // 【关键修改 4】当图片状态变化时，也需要重新计算 isEmpty
+  // 监听 disabled 变化，动态开关编辑器
+  // 这一步至关重要！没有它，isPending 变 true 时，编辑器不会锁死
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!disabled);
+    }
+  }, [disabled, editor]);
+
+  // 当图片状态变化时，也需要重新计算 isEmpty
   // 修改：Effect 依赖改为 images
   useEffect(() => {
     if (editor) {
@@ -170,10 +187,20 @@ const Editor = ({
 
       <div
         className={cn(
-          "flex flex-col border border-gray-300 rounded-md overflow-hidden bg-white focus-within:shadow-sm focus-within:border-gray-400 transition-all",
+          "relative flex flex-col border border-gray-300 rounded-md overflow-hidden bg-white focus-within:shadow-sm focus-within:border-gray-400 transition-all",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
+        {/* 插入遮罩层代码 */}
+        {disabled && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50">
+            {/* 这一层 div 会铺满整个编辑器，并半透明显示 */}
+            <span className="text-sm font-medium text-muted-foreground">
+              Message sending...
+            </span>
+          </div>
+        )}
+
         <div
           className={cn(
             "transition-all duration-200",

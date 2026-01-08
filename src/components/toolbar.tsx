@@ -63,7 +63,7 @@ export const Toolbar = ({ editor }: ToolbarProps) => {
       >
         <Strikethrough className="size-4" />
       </Button>
-      <div className="w-[1px] h-4 bg-gray-300 mx-1" /> {/* 分割线 */}
+      <div className="w-px h-4 bg-gray-300 mx-1" /> {/* 分割线 */}
       {/* 无序列表 */}
       <Button
         variant="ghost"

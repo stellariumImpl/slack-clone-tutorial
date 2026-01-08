@@ -6,16 +6,10 @@ import { useCallback, useMemo, useState } from "react";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 type RequestType = {
-  body: string;
-  workspaceId: Id<"workspaces">;
-  // 必须是后端需要的 Storage ID 数组
-  images?: Id<"_storage">[];
-  channelId?: Id<"channels">;
-  parentMessageId?: Id<"messages">;
-  // add conversationId
-  conversationId?: Id<"conversations">;
+  value: string;
+  messageId: Id<"messages">;
 };
-type ResponseType = Id<"messages"> | null;
+type ResponseType = Id<"reactions"> | null;
 
 type Options = {
   onSuccess?: (data: ResponseType) => void;
@@ -24,7 +18,7 @@ type Options = {
   throwError?: boolean;
 };
 
-export const useCreateMessage = () => {
+export const useToggleReaction = () => {
   const [data, setData] = useState<ResponseType>(null);
 
   const [error, setError] = useState<Error | null>(null);
@@ -38,7 +32,7 @@ export const useCreateMessage = () => {
   const isError = useMemo(() => status === "error", [status]);
   const isSettled = useMemo(() => status === "settled", [status]);
 
-  const mutation = useMutation(api.messages.create);
+  const mutation = useMutation(api.reactions.toggle);
 
   const mutate = useCallback(
     async (values: RequestType, options?: Options) => {

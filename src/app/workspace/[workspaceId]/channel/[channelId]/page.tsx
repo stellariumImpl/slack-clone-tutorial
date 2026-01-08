@@ -1,22 +1,30 @@
 "use client";
 
 import { useChannelId } from "@/hooks/use-channel-id";
+import { useGetMessages } from "@/features/messages/api/use-get-messages";
 import { useGetChannel } from "@/features/channels/api/use-get-channel";
 import { Loader2, TriangleAlert } from "lucide-react";
 
 import { Header } from "./header";
 // Ensure this path points to the file we created above
 import { ChatInput } from "./chat-input";
+import { MessageList } from "@/components/message-list";
 
 const ChannelIdPage = () => {
   const channelId = useChannelId();
+
+  const { results, status, loadMore } = useGetMessages({
+    channelId,
+  });
 
   const { data: channel, isLoading: channelLoading } = useGetChannel({
     id: channelId,
   });
 
+  console.log(results);
+
   // 1. Loading State (Purple Background)
-  if (channelLoading) {
+  if (channelLoading || status === "LoadingFirstPage") {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#5d33a8]">
         <div className="flex flex-col items-center gap-4">
@@ -47,7 +55,17 @@ const ChannelIdPage = () => {
       <Header name={channel.name} />
 
       {/* Spacer: pushes ChatInput to the bottom */}
-      <div className="flex-1" />
+      {/* <div className="flex-1" /> */}
+
+      {/* <div className="flex-1">{JSON.stringify(results)}</div> */}
+      <MessageList
+        channelName={channel.name}
+        channelCreationTime={channel._creationTime}
+        data={results}
+        loadMore={loadMore}
+        isLoadingMore={status === "LoadingMore"}
+        canLoadMore={status === "CanLoadMore"}
+      />
 
       <ChatInput placeholder={`Message # ${channel.name}`} />
     </div>

@@ -23,9 +23,11 @@
     "@tiptap/extension-placeholder": "^3.15.0",
     "@tiptap/react": "^3.15.0",
     "@tiptap/starter-kit": "^3.15.0",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.31.2",
+    "date-fns": "^4.1.0",
     "jotai": "^2.16.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
@@ -37,10 +39,12 @@
     "react-use": "^17.6.0",
     "react-verification-input": "^4.2.2",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "yet-another-react-lightbox": "^3.28.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

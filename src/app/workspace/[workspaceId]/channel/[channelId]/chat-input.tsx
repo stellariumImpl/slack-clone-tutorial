@@ -1,5 +1,6 @@
 "use client";
 
+import imageCompression from "browser-image-compression";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useCreateMessage } from "@/features/messages/api/use-create-messages";
@@ -60,6 +61,16 @@ export const ChatInput = ({ placeholder }: ChatInputProps) => {
       if (images && images.length > 0) {
         // 使用 map + Promise.all 并发处理每一张图片
         const uploadPromises = images.map(async (image) => {
+          console.log(`压缩前: ${image.name} - ${image.size / 1024 / 1024} MB`);
+
+          const compressedFile = await imageCompression(image, {
+            maxSizeMB: 1, // 限制最大 1MB
+            maxWidthOrHeight: 1920, // 限制最大宽/高 1920px
+            useWebWorker: true, // 开启多线程处理，避免卡顿
+          });
+
+          console.log(`压缩后: ${compressedFile.size / 1024 / 1024} MB`);
+
           // A. 为每一张图请求一个独立的上传 URL
           const url = await generateUploadUrl({}, { throwError: true });
 
@@ -71,9 +82,9 @@ export const ChatInput = ({ placeholder }: ChatInputProps) => {
           const result = await fetch(url, {
             method: "POST",
             headers: {
-              "Content-Type": image.type,
+              "Content-Type": compressedFile.type,
             },
-            body: image,
+            body: compressedFile,
           });
 
           if (!result.ok) {
