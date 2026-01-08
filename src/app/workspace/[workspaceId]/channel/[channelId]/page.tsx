@@ -1,19 +1,21 @@
 "use client";
 
 import { useChannelId } from "@/hooks/use-channel-id";
-
 import { useGetChannel } from "@/features/channels/api/use-get-channel";
-
 import { Loader2, TriangleAlert } from "lucide-react";
+
 import { Header } from "./header";
+// Ensure this path points to the file we created above
 import { ChatInput } from "./chat-input";
 
 const ChannelIdPage = () => {
   const channelId = useChannelId();
+
   const { data: channel, isLoading: channelLoading } = useGetChannel({
     id: channelId,
   });
 
+  // 1. Loading State (Purple Background)
   if (channelLoading) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#5d33a8]">
@@ -27,6 +29,7 @@ const ChannelIdPage = () => {
     );
   }
 
+  // 2. Error State (Channel Not Found)
   if (!channel) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#5d33a8]">
@@ -38,10 +41,14 @@ const ChannelIdPage = () => {
     );
   }
 
+  // 3. Main Layout
   return (
     <div className="flex flex-col h-full">
       <Header name={channel.name} />
+
+      {/* Spacer: pushes ChatInput to the bottom */}
       <div className="flex-1" />
+
       <ChatInput placeholder={`Message # ${channel.name}`} />
     </div>
   );
