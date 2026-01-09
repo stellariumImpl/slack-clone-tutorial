@@ -35,7 +35,7 @@ export const ImagesGrid = ({ images, onOpen }: ImagesGridProps) => {
             className={cn(
               "relative overflow-hidden rounded-xl cursor-zoom-in group border border-gray-100/10",
               // 如果是单张图，限制高度比例；如果是多张图，用正方形比例
-              images.length === 1 ? "aspect-[16/9]" : "aspect-square"
+              images.length === 1 ? "aspect-video" : "aspect-square"
             )}
           >
             <img

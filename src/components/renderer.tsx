@@ -34,7 +34,7 @@ const Renderer = ({ value }: RendererProps) => {
       // "tiptap" 类名是为了保持和编辑器一致的样式（如果你在 globals.css 里定义了）
       // "prose" 是 Tailwind Typography 插件，能自动美化 HTML 内容（列表、引用等）
       className={cn(
-        "tiptap prose w-full break-words shrink-0",
+        "tiptap prose w-full wrap-break-word shrink-0",
         // 覆盖一些 prose 的默认样式，使其更适合聊天气泡
         "prose-p:leading-normal prose-p:my-0 prose-p:text-sm",
         "prose-ul:my-0 prose-ul:list-disc prose-ul:pl-4",

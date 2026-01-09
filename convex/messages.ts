@@ -124,6 +124,88 @@ export const update = mutation({
   },
 });
 
+export const getById = query({
+  args: {
+    id: v.id("messages"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      return null;
+    }
+
+    const message = await ctx.db.get(args.id);
+    if (!message) {
+      return null;
+    }
+
+    const currentMember = await getMember(ctx, message.workspaceId, userId);
+    if (!currentMember) {
+      return null;
+    }
+
+    const member = await populateMember(ctx, message.memberId);
+    if (!member) {
+      return null;
+    }
+
+    const user = await populateUser(ctx, member.userId);
+    if (!user) {
+      return null;
+    }
+
+    const reactions = await populateReactions(ctx, message._id);
+
+    const reactionsWithCounts = reactions.map((reaction) => {
+      return {
+        ...reaction,
+        count: reactions.filter((r) => r.value === reaction.value).length,
+      };
+    });
+
+    const dedupedReactions = reactionsWithCounts.reduce(
+      (acc, reaction) => {
+        const existingReaction = acc.find((r) => r.value === reaction.value);
+
+        if (existingReaction) {
+          existingReaction.memberIds = Array.from(
+            new Set([...existingReaction.memberIds, reaction.memberId])
+          );
+        } else {
+          acc.push({ ...reaction, memberIds: [reaction.memberId] });
+        }
+
+        return acc;
+      },
+      [] as (Doc<"reactions"> & {
+        count: number;
+        memberIds: Id<"members">[];
+      })[]
+    );
+
+    const reactionsWithoutMemberIdProperty = dedupedReactions.map(
+      ({ memberId, ...rest }) => rest
+    );
+
+    // -------------- 新增部分开始 --------------
+    // 并发获取所有图片的 URL
+    const images = await Promise.all(
+      (message.images || []).map(async (imageId) => {
+        return await ctx.storage.getUrl(imageId);
+      })
+    );
+    // -------------- 新增部分结束 --------------
+
+    return {
+      ...message,
+      images: images.filter((url): url is string => url !== null),
+      user,
+      member,
+      reactions: reactionsWithoutMemberIdProperty,
+    };
+  },
+});
+
 export const get = query({
   args: {
     channelId: v.optional(v.id("channels")),

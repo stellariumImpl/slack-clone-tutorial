@@ -232,7 +232,7 @@ const Editor = ({
                           imageElementRef.current.value = "";
                         }
                       }}
-                      className="hidden group-hover/image:flex rounded-full bg-black/70 hover:bg-black absolute -top-2.5 -right-2.5 text-white size-6 z-[4] border-2 border-white items-center justify-center"
+                      className="hidden group-hover/image:flex rounded-full bg-black/70 hover:bg-black absolute -top-2.5 -right-2.5 text-white size-6 z-4 border-2 border-white items-center justify-center"
                     >
                       <XIcon className="size-3.5" />
                     </button>
