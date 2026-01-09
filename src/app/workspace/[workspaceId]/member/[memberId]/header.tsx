@@ -2,16 +2,22 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FaChevronDown } from "react-icons/fa";
 
+import { Video } from "lucide-react";
+
 interface HeaderProps {
   memberName?: string;
   memberImage?: string;
   onClick?: () => void;
+
+  onCall?: () => void;
 }
 
 export const Header = ({
   memberName = "Member",
   memberImage,
   onClick,
+
+  onCall,
 }: HeaderProps) => {
   const avatarFallback = memberName.charAt(0).toUpperCase();
 
@@ -29,6 +35,10 @@ export const Header = ({
         </Avatar>
         <span className="truncate">{memberName}</span>
         <FaChevronDown className="ml-2 size-2.5" />
+      </Button>
+      {/* 3. 右侧：添加视频通话按钮 */}
+      <Button variant="ghost" size="iconSm" onClick={onCall}>
+        <Video className="size-5 text-muted-foreground" />
       </Button>
     </div>
   );

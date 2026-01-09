@@ -19,10 +19,14 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { useToggleReaction } from "@/features/reactions/api/use-toggle-reaction";
 import { Reactions } from "./reactions";
 import { usePanel } from "@/hooks/use-panel";
+import { ThreadBar } from "./thread-bar";
 
 const Renderer = dynamic(() => import("@/components/renderer"), { ssr: false });
 
 const Editor = dynamic(() => import("@/components/editor"), { ssr: false });
+
+const VIDEO_CALL_TEXT =
+  "🎥 I started a video call. Click the video icon to join!";
 
 interface MessageProps {
   id: Id<"messages">;
@@ -45,7 +49,8 @@ interface MessageProps {
   isCompact?: boolean;
   hideThreadButton?: boolean;
   threadCount?: number;
-  threadImage?: string[];
+  threadImage?: string;
+  threadName?: string;
   threadTimestamp?: number;
 }
 
@@ -70,6 +75,7 @@ export const Message = ({
   hideThreadButton,
   threadCount,
   threadImage,
+  threadName,
   threadTimestamp,
 }: MessageProps) => {
   const { parentMessageId, onOpenMessage, onCloseMessage } = usePanel();
@@ -196,6 +202,13 @@ export const Message = ({
                   ) : null}
                   {/* {JSON.stringify(reactions)} */}
                   <Reactions data={reactions} onChange={handleReaction} />
+                  <ThreadBar
+                    count={threadCount}
+                    image={threadImage}
+                    name={threadName}
+                    timestamp={threadTimestamp}
+                    onClick={() => onOpenMessage(id)}
+                  />
                 </>
               )}
             </div>
@@ -219,6 +232,9 @@ export const Message = ({
   }
 
   const avatarFallback = authorName.charAt(0).toUpperCase();
+
+  // hardcoding：只要body完全等于这个字符串，就认定为系统消息
+  const isSystemMessage = body === VIDEO_CALL_TEXT;
 
   return (
     <>
@@ -284,6 +300,13 @@ export const Message = ({
                 ) : null}
                 {/* {JSON.stringify(reactions)} */}
                 <Reactions data={reactions} onChange={handleReaction} />
+                <ThreadBar
+                  count={threadCount}
+                  image={threadImage}
+                  name={threadName}
+                  timestamp={threadTimestamp}
+                  onClick={() => onOpenMessage(id)}
+                />
               </>
             )}
           </div>
@@ -299,6 +322,7 @@ export const Message = ({
             handleDelete={handleRemove}
             handleReaction={handleReaction}
             hideThreadButton={hideThreadButton}
+            isSystemMessage={isSystemMessage}
           />
         )}
       </div>
