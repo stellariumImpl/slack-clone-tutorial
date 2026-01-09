@@ -104,6 +104,9 @@ export const MessageList = ({
                 threadImage={message.threadImage?.[0]}
                 threadName={message.threadName}
                 threadTimestamp={message.threadTimestamp}
+                // type 和 callDuration
+                type={message.type}
+                callDuration={message.callDuration}
               />
             );
           })}

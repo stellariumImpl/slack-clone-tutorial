@@ -20,7 +20,12 @@ import { useCreateChannelModal } from "@/features/channels/store/use-create-chan
 
 import { useMemberId } from "@/hooks/use-member-id";
 
+import { usePathname } from "next/navigation";
+
 export const WorkspaceSidebar = () => {
+  // 获取当前路径
+  const pathname = usePathname();
+
   const memberId = useMemberId();
   const channelId = useChannelId();
   const workspaceId = useWorkspaceId();
@@ -75,13 +80,13 @@ export const WorkspaceSidebar = () => {
           label="Threads"
           icon={MessageSquareText}
           id="threads"
-          variant="active"
+          variant={pathname.includes("/threads") ? "active" : "default"}
         />
         <SidebarItem
           label="Draft & Sent"
           icon={SendHorizonal}
           id="drafts"
-          variant="default"
+          variant={pathname.includes("/drafts") ? "active" : "default"}
         />
       </div>
       <WorkspaceSection

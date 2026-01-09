@@ -2,8 +2,7 @@
 
 import { Doc, Id } from "../../convex/_generated/dataModel";
 import { Hint } from "./hint";
-// import Renderer from "./renderer";
-import { ImagesGrid } from "./thumbnail"; // 替换了原来的 Thumbnail
+import { ImagesGrid } from "./thumbnail";
 import { format, isToday, isYesterday } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useState } from "react";
@@ -20,13 +19,11 @@ import { useToggleReaction } from "@/features/reactions/api/use-toggle-reaction"
 import { Reactions } from "./reactions";
 import { usePanel } from "@/hooks/use-panel";
 import { ThreadBar } from "./thread-bar";
+// 1. 引入图标
+import { Phone, PhoneOff } from "lucide-react";
 
 const Renderer = dynamic(() => import("@/components/renderer"), { ssr: false });
-
 const Editor = dynamic(() => import("@/components/editor"), { ssr: false });
-
-const VIDEO_CALL_TEXT =
-  "🎥 I started a video call. Click the video icon to join!";
 
 interface MessageProps {
   id: Id<"messages">;
@@ -52,10 +49,22 @@ interface MessageProps {
   threadImage?: string;
   threadName?: string;
   threadTimestamp?: number;
+
+  // 2. 【新增】接收类型和时长
+  type?: "text" | "call";
+  callDuration?: number;
 }
 
 const formatFullTime = (date: Date) => {
   return `${isToday(date) ? "Today" : isYesterday(date) ? "Yesterday" : format(date, "MMM d, yyyy")} at ${format(date, "h:mm:ss a")}`;
+};
+
+// 辅助函数：格式化毫秒为 mm:ss
+const formatDuration = (ms: number) => {
+  const seconds = Math.floor(ms / 1000);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
 };
 
 export const Message = ({
@@ -77,10 +86,10 @@ export const Message = ({
   threadImage,
   threadName,
   threadTimestamp,
+  type,
+  callDuration,
 }: MessageProps) => {
   const { parentMessageId, onOpenMessage, onCloseMessage } = usePanel();
-
-  // --- 新增：Lightbox 状态管理 ---
   const [isImageOpen, setIsImageOpen] = useState(false);
   const [initialIndex, setInitialIndex] = useState(0);
 
@@ -88,34 +97,27 @@ export const Message = ({
     setInitialIndex(index);
     setIsImageOpen(true);
   };
-  // ---------------------------
 
   const { mutate: updateMessage, isPending: isUpdatingMessage } =
     useUpdateMessage();
-
   const isPending = isUpdatingMessage;
 
   const handleUpdate = ({ body }: { body: string }) => {
     updateMessage(
-      {
-        id,
-        body,
-      },
+      { id, body },
       {
         onSuccess: () => {
-          toast.success("Message updated successfully");
+          toast.success("Message updated");
           setEditingId(null);
         },
-        onError: (error) => {
-          toast.error("Failed to update message");
-        },
+        onError: () => toast.error("Failed to update message"),
       }
     );
   };
 
   const [ConfirmDialog, confirm] = useConfirm(
     "Delete message",
-    "Are you sure you want to delete this message? This action is irreversible."
+    "Are you sure you want to delete this message?"
   );
 
   const { mutate: removeMessage, isPending: isRemovingMessage } =
@@ -125,41 +127,75 @@ export const Message = ({
     const ok = await confirm();
     if (!ok) return;
     removeMessage(
-      {
-        id,
-      },
+      { id },
       {
         onSuccess: () => {
-          toast.success("Message removed successfully");
-          // Close thread if opened
-
-          if (parentMessageId === id) {
-            onCloseMessage();
-          }
+          toast.success("Message removed");
+          if (parentMessageId === id) onCloseMessage();
         },
-        onError: (error) => {
-          toast.error("Failed to remove message");
-        },
+        onError: () => toast.error("Failed to remove message"),
       }
     );
   };
 
-  const { mutate: toggleReaction, isPending: isTogglingReaction } =
-    useToggleReaction();
-
+  const { mutate: toggleReaction } = useToggleReaction();
   const handleReaction = (value: string) => {
     toggleReaction(
-      {
-        messageId: id,
-        value,
-      },
-      {
-        onError: (error) => {
-          toast.error("Failed to toggle reaction");
-        },
-      }
+      { messageId: id, value },
+      { onError: () => toast.error("Failed to toggle reaction") }
     );
   };
+
+  // 3. 判断是否为系统消息
+  // 只要 type 是 "call"，或者 callDuration 存在，都算系统消息
+  // 这样即使挂断后修改了 body，它依然被锁定
+  const isSystemMessage = type === "call";
+
+  // 4. 渲染通话卡片的组件
+  const CallCard = () => {
+    // 如果有 duration，说明通话已结束
+    const isEnded = !!callDuration;
+
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-3 p-3 rounded-lg border w-fit max-w-[300px]",
+          isEnded
+            ? "bg-gray-50 border-gray-200 text-gray-600" // 结束样式
+            : "bg-emerald-50 border-emerald-200 text-emerald-700" // 进行中样式
+        )}
+      >
+        <div
+          className={cn(
+            "p-2 rounded-full",
+            isEnded ? "bg-gray-200" : "bg-emerald-200"
+          )}
+        >
+          {isEnded ? (
+            <PhoneOff className="size-5" />
+          ) : (
+            <Phone className="size-5 animate-pulse" />
+          )}
+        </div>
+        <div className="flex flex-col">
+          <span className="font-semibold text-sm">
+            {isEnded ? "Video call ended" : "Video call started"}
+          </span>
+          <span className="text-xs opacity-90">
+            {isEnded
+              ? `Duration: ${formatDuration(callDuration!)}`
+              : "Click the video icon to join"}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const avatarFallback = authorName.charAt(0).toUpperCase();
+
+  // ----------------------------------------------------------------------
+  // 渲染逻辑开始
+  // ----------------------------------------------------------------------
 
   if (isCompact) {
     return (
@@ -192,15 +228,16 @@ export const Message = ({
                 </div>
               ) : (
                 <>
-                  <Renderer value={body} />
-                  {/* 替换为 ImagesGrid */}
+                  {/* 5. 核心逻辑：如果是 Call 就渲染卡片，否则渲染文本 */}
+                  {type === "call" ? <CallCard /> : <Renderer value={body} />}
+
+                  {/* 通用部分 */}
                   <ImagesGrid images={images} onOpen={handleOpenImage} />
-                  {updatedAt ? (
+                  {updatedAt && type !== "call" && (
                     <span className="text-xs text-muted-foreground">
                       (edited)
                     </span>
-                  ) : null}
-                  {/* {JSON.stringify(reactions)} */}
+                  )}
                   <Reactions data={reactions} onChange={handleReaction} />
                   <ThreadBar
                     count={threadCount}
@@ -222,20 +259,16 @@ export const Message = ({
               handleDelete={handleRemove}
               handleReaction={handleReaction}
               hideThreadButton={hideThreadButton}
+              // 传入更准确的系统消息标记
+              isSystemMessage={isSystemMessage}
             />
           )}
         </div>
-        {/* 在 compact 模式下也需要渲染 Lightbox，但为了避免重复，可以在最外层统一处理，或者在这里也加一个 */}
-        {/* 更好的做法是把 Lightbox 移到组件最外层，这里只负责布局。为了代码结构简单，我把它统一放在最后返回的 JSX 中 */}
       </>
     );
   }
 
-  const avatarFallback = authorName.charAt(0).toUpperCase();
-
-  // hardcoding：只要body完全等于这个字符串，就认定为系统消息
-  const isSystemMessage = body === VIDEO_CALL_TEXT;
-
+  // 默认模式 (非 Compact)
   return (
     <>
       <ConfirmDialog />
@@ -248,7 +281,6 @@ export const Message = ({
         )}
       >
         <div className="flex items-start gap-2">
-          {/* 左侧头像：始终显示 */}
           <button>
             <Avatar>
               <AvatarImage src={authorImage} />
@@ -258,9 +290,7 @@ export const Message = ({
             </Avatar>
           </button>
 
-          {/* 右侧主区域 */}
           <div className="flex flex-col w-full overflow-hidden">
-            {/* 1. 顶部信息栏 (名字+时间)：始终显示，不再被 isEditing 隐藏 */}
             <div className="text-sm">
               <button
                 onClick={() => {}}
@@ -276,9 +306,7 @@ export const Message = ({
               </Hint>
             </div>
 
-            {/* 2. 内容区域：根据状态切换 (编辑器 VS 渲染内容) */}
             {isEditing ? (
-              // 编辑模式：显示编辑器
               <div className="w-full h-full pt-2">
                 <Editor
                   onSubmit={handleUpdate}
@@ -289,16 +317,16 @@ export const Message = ({
                 />
               </div>
             ) : (
-              // 浏览模式：显示正文和图片
               <>
-                <Renderer value={body} />
+                {/* 5. 核心逻辑：如果是 Call 就渲染卡片，否则渲染文本 */}
+                {type === "call" ? <CallCard /> : <Renderer value={body} />}
+
                 <ImagesGrid images={images} onOpen={handleOpenImage} />
-                {updatedAt ? (
+                {updatedAt && type !== "call" && (
                   <span className="text-xs text-muted-foreground">
                     (edited)
                   </span>
-                ) : null}
-                {/* {JSON.stringify(reactions)} */}
+                )}
                 <Reactions data={reactions} onChange={handleReaction} />
                 <ThreadBar
                   count={threadCount}
@@ -312,7 +340,6 @@ export const Message = ({
           </div>
         </div>
 
-        {/* 工具栏：编辑时不显示 */}
         {!isEditing && (
           <MessageToolbar
             isAuthor={isAuthor}

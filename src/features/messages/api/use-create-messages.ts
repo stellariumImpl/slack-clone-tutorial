@@ -14,6 +14,9 @@ type RequestType = {
   parentMessageId?: Id<"messages">;
   // add conversationId
   conversationId?: Id<"conversations">;
+
+  // 新增：type字段
+  type?: "text" | "call";
 };
 type ResponseType = Id<"messages"> | null;
 

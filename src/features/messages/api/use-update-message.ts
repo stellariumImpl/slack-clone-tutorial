@@ -6,8 +6,10 @@ import { useCallback, useMemo, useState } from "react";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 type RequestType = {
-  body: string;
+  body?: string;
   id: Id<"messages">;
+  // 新增: 添加时长字段
+  callDuration?: number;
 };
 type ResponseType = Id<"messages"> | null;
 

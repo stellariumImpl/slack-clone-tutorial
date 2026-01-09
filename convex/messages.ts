@@ -100,7 +100,8 @@ export const remove = mutation({
 export const update = mutation({
   args: {
     id: v.id("messages"),
-    body: v.string(),
+    body: v.optional(v.string()), // 允许更新内容
+    callDuration: v.optional(v.number()), // 允许更新时长
   },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
@@ -113,13 +114,72 @@ export const update = mutation({
       throw new Error("Message not found");
     }
 
+    // const member = await getMember(ctx, message.workspaceId, userId);
+    // if (!member || member._id !== message.memberId) {
+    //   throw new Error("Member not found");
+    // }
+    // 太严格了 我们把规则拆开
+
     const member = await getMember(ctx, message.workspaceId, userId);
-    if (!member || member._id !== message.memberId) {
-      throw new Error("Member not found");
+    if (!member) {
+      throw new Error("Unauthorized");
+    }
+
+    // ---------------------------------------------------------
+    // 权限验证逻辑
+    // ---------------------------------------------------------
+
+    // 1. 判断是否是消息的作者
+    const isAuthor = message.memberId === member._id;
+
+    // 2. 判断是否是管理员
+    const isAdmin = member.role === "admin";
+
+    // 3. 【核心修改】开始分情况讨论
+
+    // 情况 A：如果是普通文本消息 (或者没有 type 字段)，执行严格检查
+    // 必须是作者本人，或者是管理员才能改
+    if (!message.type || message.type === "text") {
+      if (!isAuthor && !isAdmin) {
+        throw new Error("Unauthorized");
+      }
+    }
+
+    // 情况 B：如果是通话记录 (call)
+    // 允许：作者本人 OR 对话的参与者 (MemberOne / MemberTwo)
+    else if (message.type === "call") {
+      // 如果已经是作者，直接过
+      if (!isAuthor && !isAdmin) {
+        // 如果不是作者，检查是否是 1v1 对话的另一方
+        if (!message.conversationId) {
+          throw new Error("Unauthorized"); // 通话通常都有 conversationId
+        }
+
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) {
+          throw new Error("Conversation not found");
+        }
+
+        const isParticipant =
+          conversation.memberOneId === member._id ||
+          conversation.memberTwoId === member._id;
+
+        if (!isParticipant) {
+          throw new Error("Unauthorized");
+        }
+      }
+    } else {
+      // 其他未知类型，默认拒绝
+      if (!isAuthor && !isAdmin) {
+        throw new Error("Unauthorized");
+      }
     }
 
     await ctx.db.patch(args.id, {
-      body: args.body,
+      // body: args.body,
+      // 更新
+      ...(args.body ? { body: args.body } : {}),
+      ...(args.callDuration ? { callDuration: args.callDuration } : {}),
       updatedAt: Date.now(),
     });
 
@@ -331,6 +391,9 @@ export const create = mutation({
     channelId: v.optional(v.id("channels")),
     conversationId: v.optional(v.id("conversations")),
     parentMessageId: v.optional(v.id("messages")),
+
+    // 允许前端传type
+    type: v.optional(v.union(v.literal("text"), v.literal("call"))),
   },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
@@ -357,6 +420,37 @@ export const create = mutation({
       _conversationId = parentMessage.conversationId;
     }
 
+    // -------------------------------------------------------------
+    // 【新增核心逻辑】防止重复创建通话消息
+    // -------------------------------------------------------------
+
+    if (args.type === "call" && _conversationId) {
+      // 查一下该对话中，最近的一条消息
+      const existingCall = await ctx.db
+        .query("messages")
+        // 使用你现有的索引
+        .withIndex("by_channel_id_parent_message_id_conversation_id", (q) =>
+          q
+            .eq("channelId", args.channelId) // 通常是 undefined
+            .eq("parentMessageId", args.parentMessageId) // 通常是 undefined
+            .eq("conversationId", _conversationId)
+        )
+        .order("desc")
+        .first();
+
+      // 如果最近一条是通话，且还没结束 (没有 callDuration)
+      if (
+        existingCall &&
+        existingCall.type === "call" &&
+        !existingCall.callDuration
+      ) {
+        // 直接返回旧 ID，不创建新消息！
+        // 这样前端会收到这个 ID，然后加入房间，界面上也不会多一个气泡
+        return existingCall._id;
+      }
+    }
+    // -------------------------------------------------------------
+
     // insert messages
     const messageId = await ctx.db.insert("messages", {
       memberId: member._id,
@@ -367,6 +461,8 @@ export const create = mutation({
       workspaceId: args.workspaceId,
       parentMessageId: args.parentMessageId,
       // updatedAt: Date.now(),
+      // 存入type
+      type: args.type || "text",
     });
 
     return messageId;
