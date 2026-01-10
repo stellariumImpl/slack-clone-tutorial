@@ -60,6 +60,10 @@ const schema = defineSchema({
     type: v.optional(v.union(v.literal("text"), v.literal("call"))),
     // 新增：通话时长（ms），只有通话结束才有值
     callDuration: v.optional(v.number()),
+
+    replyCount: v.optional(v.number()), // 回复总数
+    lastReplyAt: v.optional(v.number()), // 最新回复时间 (用于排序)
+    participants: v.optional(v.array(v.id("members"))), // (可选) 参与者 ID 列表，用于显示头像堆叠
   })
     .index("by_workspace_id", ["workspaceId"])
     .index("by_member_id", ["memberId"])
@@ -70,7 +74,10 @@ const schema = defineSchema({
       "channelId",
       "parentMessageId",
       "conversationId",
-    ]),
+    ])
+    // 新增：核心索引，用于 getThreads 查询
+    // 我们要查 "某个 workspace 下，按 lastReplyAt 倒序排列的消息"
+    .index("by_workspace_id_last_reply_at", ["workspaceId", "lastReplyAt"]),
 
   reactions: defineTable({
     workspaceId: v.id("workspaces"),

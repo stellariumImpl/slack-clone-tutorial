@@ -465,6 +465,130 @@ export const create = mutation({
       type: args.type || "text",
     });
 
+    // 新增：如果是回复消息，更新父消息的 Thread 统计数据
+    if (args.parentMessageId) {
+      const parentMessage = await ctx.db.get(args.parentMessageId);
+
+      if (parentMessage) {
+        await ctx.db.patch(args.parentMessageId, {
+          replyCount: (parentMessage.replyCount || 0) + 1,
+          lastReplyAt: Date.now(),
+        });
+      }
+    }
+
     return messageId;
   },
 });
+
+// ---------------------------------------------------------------------
+// 新增 getThreads 查询 API
+// ---------------------------------------------------------------------
+export const getThreads = query({
+  args: {
+    workspaceId: v.id("workspaces"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) return { page: [], isDone: false, continueCursor: "" };
+
+    const member = await getMember(ctx, args.workspaceId, userId);
+    if (!member) return { page: [], isDone: false, continueCursor: "" };
+
+    // // 🔍 【DEBUG 1】打印查询条件
+    // console.log(
+    //   "👉 [Backend] getThreads called for Workspace:",
+    //   args.workspaceId
+    // );
+
+    // 利用新索引查询：查该 Workspace 下所有有 lastReplyAt 值的消息，按时间倒序
+    const results = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_id_last_reply_at", (q) =>
+        q.eq("workspaceId", args.workspaceId)
+      )
+      .order("desc") // 最新的回复排前面
+      .paginate(args.paginationOpts);
+
+    // // 🔍 【DEBUG 2】打印查到的原始数据条数
+    // console.log("👉 [Backend] Raw results count:", results.page.length);
+    // if (results.page.length > 0) {
+    //   console.log("👉 [Backend] First item sample:", results.page[0]);
+    // }
+
+    return {
+      ...results,
+      page: (
+        await Promise.all(
+          results.page.map(async (message) => {
+            // 过滤掉没有回复的普通消息 (理论上 index 应该只包含有值的，但双重保险)
+            if (!message.lastReplyAt) {
+              // // 🔍 【DEBUG 3】检查每一条消息是否有 lastReplyAt
+              // console.log(
+              //   "⚠️ [Backend] Skipping message because no lastReplyAt:",
+              //   message._id
+              // );
+              return null;
+            }
+
+            const member = await populateMember(ctx, message.memberId);
+            const user = member ? await populateUser(ctx, member.userId) : null;
+
+            if (!member || !user) return null;
+
+            // 获取 Channel 信息，用于 UI 显示 "#General" 并跳转
+            const channel = message.channelId
+              ? await ctx.db.get(message.channelId)
+              : null;
+
+            // 核心修复：把 Storage ID 转换成 URL
+            const images = await Promise.all(
+              (message.images || []).map(async (imageId) => {
+                return await ctx.storage.getUrl(imageId);
+              })
+            );
+            return {
+              ...message,
+              member,
+              user,
+              channel,
+              channelName: channel?.name,
+              // 用生成的 URL 数组覆盖掉原来的 ID 数组
+              images: images.filter((url): url is string => url !== null),
+            };
+          })
+        )
+      ).filter((t): t is NonNullable<typeof t> => t !== null),
+    };
+  },
+});
+
+// 这是一个一次性工具，用来修复旧数据
+// export const backfillThreadData = mutation({
+//   args: {},
+//   handler: async (ctx) => {
+//     // 1. 查出所有的消息
+//     const allMessages = await ctx.db.query("messages").collect();
+
+//     let count = 0;
+
+//     for (const msg of allMessages) {
+//       // 如果这条消息有 parentMessageId，说明它是一条回复
+//       if (msg.parentMessageId) {
+//         // 找到它的父消息
+//         const parent = await ctx.db.get(msg.parentMessageId);
+//         if (parent) {
+//           // 更新父消息的 lastReplyAt 和 replyCount
+//           await ctx.db.patch(parent._id, {
+//             lastReplyAt: msg._creationTime, // 简单起见，用最近一条回复的时间覆盖
+//             replyCount: (parent.replyCount || 0) + 1,
+//           });
+//           count++;
+//         }
+//       }
+//     }
+
+//     return `Fixed ${count} threads!`;
+//   },
+// });
