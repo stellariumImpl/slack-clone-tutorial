@@ -20,9 +20,15 @@ export const createOrGet = mutation({
       )
       .unique();
 
+    if (!currentMember) {
+      throw new Error("Unauthorized");
+    }
+
     const otherMember = await ctx.db.get(args.memberId);
-    if (!currentMember || !otherMember) {
-      throw new Error("Member not found");
+
+    // 🔴 必须确保这里是 return null，绝对不能是 throw Error
+    if (!otherMember) {
+      return null;
     }
 
     const existingConversation = await ctx.db

@@ -8,7 +8,8 @@ interface UseGetMemberProps {
 }
 
 export const useGetMember = ({ id }: UseGetMemberProps) => {
-  const data = useQuery(api.members.getById, { id });
+  // 🔥 核心修改：如果 id 不存在，传入 "skip" 跳过查询，防止 ArgumentValidationError
+  const data = useQuery(api.members.getById, id ? { id } : "skip");
 
   const isLoading = data === undefined;
 
