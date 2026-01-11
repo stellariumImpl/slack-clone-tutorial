@@ -4,25 +4,21 @@ import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { Loader2, TrashIcon, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-// 🔥 引入 Convex
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
-import { Id } from "../../../../../../convex/_generated/dataModel";
 
 import { cn } from "@/lib/utils";
-// 引入 toast
 import { toast } from "sonner";
-// 🔥🔥 1. 引入自定义的 Confirm Hook
 import { useConfirm } from "@/hooks/use-confirm";
 
-// 工具函数：去除 HTML 标签
+// 去除 HTML
 const stripHtml = (html: string) => {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
   return doc.body.textContent || "";
 };
 
-// 格式化时间
+// 时间格式
 const formatTime = (timestamp: number) => {
   const date = new Date(timestamp);
   return date.toLocaleString([], {
@@ -37,10 +33,9 @@ const DraftsPage = () => {
   const workspaceId = useWorkspaceId();
   const router = useRouter();
 
-  // 🔥🔥 2. 初始化 ConfirmDialog
   const [ConfirmDialog, confirm] = useConfirm(
-    "Delete Draft", // 标题
-    "Are you sure you want to delete this draft? This action cannot be undone." // 内容
+    "Delete Draft",
+    "Are you sure you want to delete this draft? This action cannot be undone."
   );
 
   const drafts = useQuery(api.drafts.getDrafts, { workspaceId });
@@ -48,77 +43,58 @@ const DraftsPage = () => {
 
   if (drafts === undefined) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#5d33a8]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="size-10 animate-spin text-white/80" />
-          <p className="text-white/80 font-bold text-lg tracking-wide">
-            Loading...
-          </p>
-        </div>
+      <div className="h-full flex items-center justify-center bg-[#5d33a8]">
+        <Loader2 className="size-8 animate-spin text-white/80" />
       </div>
     );
   }
 
-  // 处理跳转逻辑
   const handleJump = (draft: any) => {
     if (!draft.targetId) return;
 
-    // 1. 基础路径：先判断是去频道还是去私聊
-    let path = "";
-    if (draft.type === "channel") {
-      path = `/workspace/${workspaceId}/channel/${draft.targetId}`;
-    } else {
-      path = `/workspace/${workspaceId}/member/${draft.targetId}`;
-    }
+    let path =
+      draft.type === "channel"
+        ? `/workspace/${workspaceId}/channel/${draft.targetId}`
+        : `/workspace/${workspaceId}/member/${draft.targetId}`;
 
-    // 2. 核心修复：如果有 parentMessageId，说明这是个 Thread 回复
-    // 我们需要把它作为 query param 拼接到 URL 后面
     if (draft.parentMessageId) {
       path += `?parentMessageId=${draft.parentMessageId}`;
     }
 
-    // 3. 执行跳转
     router.push(path);
   };
 
-  // 🔥🔥 3. 修改删除逻辑为异步，并调用自定义 confirm
   const handleDelete = async (e: React.MouseEvent, draft: any) => {
-    // 阻止冒泡，防止触发跳转
     e.stopPropagation();
-
-    // 唤起自定义弹窗，等待用户选择
     const ok = await confirm();
 
-    // 如果用户点击了 Confirm (ok 为 true)
-    if (ok) {
-      removeDraft({
-        workspaceId,
-        channelId: draft.channelId,
-        parentMessageId: draft.parentMessageId,
-        conversationId: draft.conversationId,
-      })
-        .then(() => {
-          toast.success("Draft deleted");
-        })
-        .catch(() => {
-          toast.error("Failed to delete draft");
-        });
-    }
+    if (!ok) return;
+
+    removeDraft({
+      workspaceId,
+      channelId: draft.channelId,
+      parentMessageId: draft.parentMessageId,
+      conversationId: draft.conversationId,
+    })
+      .then(() => toast.success("Draft deleted"))
+      .catch(() => toast.error("Failed to delete draft"));
   };
 
   return (
-    // 🔥🔥 4. 记得把 ConfirmDialog 渲染出来，通常放在最外层 Fragment 里
     <>
       <ConfirmDialog />
+
       <div className="flex flex-col h-full bg-white">
-        <div className="flex items-center justify-between px-4 h-[49px] border-b bg-white shrink-0">
+        {/* Header */}
+        <div className="flex items-center px-4 h-[49px] border-b shrink-0">
           <span className="text-lg font-bold">Drafts</span>
         </div>
 
+        {/* List */}
         <div className="flex-1 overflow-y-auto messages-scrollbar">
           {drafts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-10">
-              <p>No drafts found.</p>
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              No drafts found.
             </div>
           ) : (
             <div className="flex flex-col">
@@ -127,42 +103,72 @@ const DraftsPage = () => {
                   key={draft._id}
                   onClick={() => handleJump(draft)}
                   className={cn(
-                    "flex flex-col gap-2 p-1.5 px-5 hover:bg-gray-100/60 group relative cursor-pointer transition-colors"
+                    "group relative cursor-pointer",
+                    "hover:bg-gray-100/60 transition-colors",
+                    // 左侧 Hover 引导线
+                    "before:absolute before:left-0 before:top-0 before:h-full before:w-[2px]"
+                    // "before:bg-transparent hover:before:bg-purple-500"
                   )}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-x-2">
-                      <span className="font-bold text-sm text-[#1d1c1d] hover:underline cursor-pointer">
-                        {draft.displayTitle || "Untitled"}
-                      </span>
-
-                      {draft.parentMessageId && (
-                        <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
-                          Thread
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center">
-                      <span className="text-xs text-muted-foreground group-hover:opacity-0 font-mono transition-opacity">
-                        {formatTime(draft._creationTime)}
-                      </span>
-
-                      <div className="absolute right-5 flex items-center gap-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          className="size-6 flex items-center justify-center rounded-md hover:bg-red-100 text-muted-foreground hover:text-red-600 transition-colors cursor-pointer"
-                          onClick={(e) => handleDelete(e, draft)}
-                        >
-                          <TrashIcon className="size-3.5" />
-                        </button>
-
-                        <ArrowRight className="size-4 text-muted-foreground" />
+                  <div className="flex gap-x-3 px-5 py-2">
+                    {/* 左侧 Icon 锚点 */}
+                    <div className="shrink-0 pt-0.5">
+                      <div
+                        className={cn(
+                          "size-8 rounded-md flex items-center justify-center",
+                          "text-xs font-bold select-none",
+                          draft.parentMessageId
+                            ? "bg-sky-100 text-sky-700"
+                            : draft.type === "channel"
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-green-100 text-green-700"
+                        )}
+                      >
+                        {draft.parentMessageId
+                          ? "&"
+                          : draft.type === "channel"
+                            ? "#"
+                            : "@"}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="text-[15px] text-gray-600 line-clamp-2 break-all">
-                    {stripHtml(draft.body)}
+                    {/* 主体内容 */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-x-2 min-w-0">
+                          <span className="font-bold text-sm truncate">
+                            {draft.displayTitle || "Untitled"}
+                          </span>
+
+                          {/* {draft.parentMessageId && (
+                            <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded font-medium">
+                              Thread
+                            </span>
+                          )} */}
+                        </div>
+
+                        {/* 右侧时间 / 操作 */}
+                        <div className="flex items-center">
+                          <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground group-hover:opacity-0 font-mono transition-opacity">
+                            {formatTime(draft._creationTime)}
+                          </span>
+
+                          <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              className="size-6 flex items-center justify-center rounded-md hover:bg-red-100 text-muted-foreground hover:text-red-600 transition-colors cursor-pointer"
+                              onClick={(e) => handleDelete(e, draft)}
+                            >
+                              <TrashIcon className="size-3.5" />
+                            </button>
+                            <ArrowRight className="size-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[14px] text-gray-600 line-clamp-2 break-all">
+                        {stripHtml(draft.body)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
