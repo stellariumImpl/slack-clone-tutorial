@@ -301,6 +301,10 @@ export const Thread = ({ messageId, onCloseMessage }: ThreadProps) => {
           onSubmit={handleSubmit}
           disabled={isPending}
           placeholder="Reply..."
+          // 🔥🔥🔥 新增：传入这三个参数，激活 Thread 内的草稿功能
+          workspaceId={workspaceId}
+          channelId={channelId}
+          parentMessageId={messageId}
         />
       </div>
     </div>

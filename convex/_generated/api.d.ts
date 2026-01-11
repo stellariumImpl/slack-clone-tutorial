@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as channels from "../channels.js";
 import type * as conversations from "../conversations.js";
+import type * as drafts from "../drafts.js";
 import type * as http from "../http.js";
 import type * as livekit from "../livekit.js";
 import type * as members from "../members.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   channels: typeof channels;
   conversations: typeof conversations;
+  drafts: typeof drafts;
   http: typeof http;
   livekit: typeof livekit;
   members: typeof members;

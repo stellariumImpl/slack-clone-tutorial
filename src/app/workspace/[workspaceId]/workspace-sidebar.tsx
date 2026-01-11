@@ -83,7 +83,7 @@ export const WorkspaceSidebar = () => {
           variant={pathname.includes("/threads") ? "active" : "default"}
         />
         <SidebarItem
-          label="Draft & Sent"
+          label="Drafts"
           icon={SendHorizonal}
           id="drafts"
           variant={pathname.includes("/drafts") ? "active" : "default"}

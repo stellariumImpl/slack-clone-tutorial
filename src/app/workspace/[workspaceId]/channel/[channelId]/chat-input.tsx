@@ -122,6 +122,8 @@ export const ChatInput = ({ placeholder }: ChatInputProps) => {
         placeholder={placeholder}
         onSubmit={handleSubmit} // 绑定上面的模拟发送函数
         disabled={isPending} // 发送中禁用
+        workspaceId={workspaceId}
+        channelId={channelId}
       />
     </div>
   );

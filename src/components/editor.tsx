@@ -12,12 +12,24 @@ import {
   ImageIcon,
   XIcon,
 } from "lucide-react";
-import { useState, MutableRefObject, useRef, useEffect } from "react";
+import {
+  useState,
+  MutableRefObject,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import { cn } from "@/lib/utils";
 import { Hint } from "./hint";
 import Image from "next/image";
 
 import { EmojiPopover } from "./emoji-popover";
+
+// 🔥🔥 引入 Convex 和 Lodash
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Id } from "../../convex/_generated/dataModel";
+import debounce from "lodash/debounce";
 
 // 修改类型定义，因为我希望image变成images
 type EditorValue = {
@@ -32,8 +44,15 @@ interface EditorProps {
   placeholder?: string;
   defaultValue?: string | JSONContent;
   disabled?: boolean;
-  innerRef?: MutableRefObject<any>;
   variant?: "create" | "update";
+
+  // 🔥🔥 接收 ID 参数 (必须传)
+  workspaceId?: Id<"workspaces">;
+  channelId?: Id<"channels">;
+  parentMessageId?: Id<"messages">;
+
+  // 🔥 新增
+  conversationId?: Id<"conversations">;
 }
 
 const Editor = ({
@@ -42,9 +61,21 @@ const Editor = ({
   placeholder = "Write something...",
   defaultValue = "",
   disabled = false,
-  innerRef,
   variant = "create",
+  workspaceId,
+  channelId,
+  parentMessageId,
+  // 🔥 接收面对面conversation参数
+  conversationId,
 }: EditorProps) => {
+  // 用来标记“当前频道的草稿是否已经初始化过”
+  // 🔒 锁1：负责“只读一次”
+  const isMessageLoadedRef = useRef(false);
+
+  // 🔒 锁2：负责“刚刚发送完” (新增这把锁！)
+  // 专门用来防御：ID变化导致的锁1重置 + 后端删除延迟
+  const isSubmittingRef = useRef(false);
+
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
 
   // 修改：状态改为数组，初始为空数组
@@ -55,6 +86,45 @@ const Editor = ({
   const [isEmpty, setIsEmpty] = useState(true);
 
   const imageElementRef = useRef<HTMLInputElement>(null);
+
+  // 🔥🔥 只有在 create 模式且参数齐全时，才启用草稿功能
+  const enableDrafts = variant === "create" && !!workspaceId;
+  // 读取草稿
+  const draftData = useQuery(
+    api.drafts.get,
+    enableDrafts ? { workspaceId, channelId, parentMessageId } : "skip"
+  );
+
+  // 准备 mutation
+  const saveDraft = useMutation(api.drafts.save);
+  const removeDraft = useMutation(api.drafts.remove);
+
+  // 🔥🔥 创建防抖保存函数 (500ms 延迟)
+  // 只有停止打字 500ms 后，才请求后端保存
+  const debouncedSave = useCallback(
+    debounce(
+      (values: {
+        body: string;
+        workspaceId: Id<"workspaces">;
+        channelId?: Id<"channels">;
+        parentMessageId?: Id<"messages">;
+        conversationId?: Id<"conversations">;
+      }) => {
+        saveDraft(values);
+      },
+      500
+    ),
+    [saveDraft]
+  );
+
+  // 🔥 每次切换频道/对话时，把锁打开，允许加载新草稿
+  // 🔄 监听 ID 变化
+  useEffect(() => {
+    // 只有当真正的频道/对话 ID 发生变化时，才重置加载锁
+    isMessageLoadedRef.current = false;
+    // 注意：这里我们【不】重置 isSubmittingRef
+    // 这样即使 ID 在发送瞬间变了（比如创建新对话），“正在提交”的拦截状态依然有效
+  }, [workspaceId, channelId, parentMessageId, conversationId]);
 
   const editor = useEditor({
     extensions: [
@@ -91,8 +161,20 @@ const Editor = ({
           if (!images.length && (!text || text.trim().length === 0)) {
             return true;
           }
+
+          // 🛑【第一处修改】按下回车瞬间，立马落锁！
+          isSubmittingRef.current = true;
+
           // 提交 images 数组
           onSubmit({ body: editor?.getHTML() || "", images });
+
+          // 🔥🔥 发送成功后，删除草稿
+          if (enableDrafts && workspaceId) {
+            // 🔥 新增：立刻取消掉任何即将发生的保存，防止“回光返照”
+            debouncedSave.cancel();
+            removeDraft({ workspaceId, channelId, parentMessageId });
+          }
+
           // 补全：清理工作 (与 Send 按钮保持一致)
           editor?.commands.clearContent();
           setImages([]); // 清空数组
@@ -103,6 +185,12 @@ const Editor = ({
           if (imageElementRef.current) {
             imageElementRef.current.value = "";
           }
+
+          // ⏰【新增】1秒后解锁，防止永久锁死（虽然切换频道会重置组件，但为了保险）
+          setTimeout(() => {
+            isSubmittingRef.current = false;
+          }, 1000);
+
           return true;
         }
         return false;
@@ -114,6 +202,19 @@ const Editor = ({
       // 如果有图片 或者 有文字，isEmpty 为 false
       // 修改：逻辑判断
       setIsEmpty(images.length === 0 && text.length === 0);
+
+      const html = editor.getHTML();
+      // 🔥🔥 监听内容变化，更新草稿
+      // 核心修复：只有当编辑器“不为空”时，才执行保存
+      if (enableDrafts && workspaceId && !editor.isEmpty) {
+        debouncedSave({
+          body: html,
+          workspaceId,
+          channelId,
+          parentMessageId,
+          conversationId,
+        });
+      }
     },
     // 【关键修改 3】监听选区更新 (可选，有时光标变动也需要重新检查)
     onSelectionUpdate({ editor }) {
@@ -122,6 +223,34 @@ const Editor = ({
     },
     immediatelyRender: false,
   });
+
+  // 🔥🔥 核心修复：只在初始化时加载一次草稿，后续坚决不再同步
+  useEffect(() => {
+    // 1. 如果编辑器不存在 / 已销毁 / 已经加载过一次 / 🛑 或者正在提交中
+    if (
+      !editor ||
+      editor.isDestroyed ||
+      isMessageLoadedRef.current ||
+      isSubmittingRef.current
+    ) {
+      return;
+    }
+
+    // 2. 如果 draftData 还没从后端加载回来 (undefined)，继续等
+    if (draftData === undefined) return;
+
+    // 3. 标记为“已处理”
+    // 无论有没有草稿，只要数据回来了，我们就认为初始化完成了。
+    // 这样当你发送消息清空编辑器时，这个 Effect 就会因为这个标记而拒绝执行回填。
+    isMessageLoadedRef.current = true;
+
+    // 4. 只有真的有内容时，才填充
+    if (draftData?.body) {
+      editor.commands.setContent(draftData.body);
+      // 顺便把光标移到最后，体验更好
+      editor.commands.focus("end");
+    }
+  }, [draftData, editor]);
 
   // 监听 disabled 变化，动态开关编辑器
   // 这一步至关重要！没有它，isPending 变 true 时，编辑器不会锁死
@@ -326,7 +455,23 @@ const Editor = ({
                 disabled={disabled || isEmpty}
                 size="icon"
                 onClick={() => {
+                  // 🛑【修改 1】一点击马上落锁
+                  isSubmittingRef.current = true;
+
                   onSubmit({ body: editor.getHTML(), images });
+
+                  // 🔥 点击按钮发送时，删除草稿
+                  if (enableDrafts && workspaceId) {
+                    // 🔥 新增：这里也要加 cancel
+                    debouncedSave.cancel();
+                    removeDraft({
+                      workspaceId,
+                      channelId,
+                      parentMessageId,
+                      conversationId,
+                    });
+                  }
+
                   // 1. 清理 Tiptap 内容
                   editor.commands.clearContent();
                   // 2. 清理图片状态
@@ -337,6 +482,12 @@ const Editor = ({
                   if (imageElementRef.current) {
                     imageElementRef.current.value = "";
                   }
+
+                  // ⏰【修改 2】1秒后解锁
+                  // 👈 加在函数最后面
+                  setTimeout(() => {
+                    isSubmittingRef.current = false;
+                  }, 1000);
                 }}
                 className={cn(
                   "size-8 transition-colors cursor-pointer",

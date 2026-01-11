@@ -88,6 +88,24 @@ const schema = defineSchema({
     .index("by_workspace_id", ["workspaceId"])
     .index("by_message_id", ["messageId"])
     .index("by_member_id", ["memberId"]),
+
+  drafts: defineTable({
+    workspaceId: v.id("workspaces"),
+    memberId: v.id("members"), // 谁写的
+    channelId: v.optional(v.id("channels")), // 在哪个频道
+    parentMessageId: v.optional(v.id("messages")), // (可选) 在哪个 Thread
+    body: v.string(), // 草稿内容 (HTML/JSON 字符串)
+    updatedAt: v.number(),
+
+    // 🔥 新增：支持私聊 ID
+    conversationId: v.optional(v.id("conversations")),
+  })
+    // 索引 1：为了快速查找 "我在这个频道有没有草稿"
+    .index("by_user_channel", ["memberId", "channelId", "parentMessageId"])
+    // 索引 2：为了将来做 "Drafts 列表页" (查我在这个工作区所有的草稿)
+    .index("by_workspace_member", ["workspaceId", "memberId"])
+    // 🔥 新增：为了快速查找 "我在这个私聊里的草稿"
+    .index("by_user_conversation", ["memberId", "conversationId"]),
 });
 
 export default schema;
