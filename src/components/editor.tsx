@@ -66,7 +66,7 @@ const Editor = ({
   channelId,
   parentMessageId,
   // 🔥 接收面对面conversation参数
-  conversationId,
+  conversationId, // ✅ 接收参数
 }: EditorProps) => {
   // 用来标记“当前频道的草稿是否已经初始化过”
   // 🔒 锁1：负责“只读一次”
@@ -92,7 +92,14 @@ const Editor = ({
   // 读取草稿
   const draftData = useQuery(
     api.drafts.get,
-    enableDrafts ? { workspaceId, channelId, parentMessageId } : "skip"
+    enableDrafts
+      ? {
+          workspaceId,
+          channelId,
+          parentMessageId, // 🔥🔥🔥 【核心修复】必须加上这个！
+          conversationId,
+        }
+      : "skip"
   );
 
   // 准备 mutation

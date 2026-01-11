@@ -60,7 +60,7 @@ export const Thread = ({ messageId, onCloseMessage }: ThreadProps) => {
 
   // 1. editorKey: 用来“刷新”编辑器的。
   // 当 key 变化时，React 会重新创建组件，从而清空输入框内容。
-  const [editorKey, setEditorKey] = useState(0);
+  // const [editorKey, setEditorKey] = useState(0);
 
   // 2. isPending: 用来控制“正在发送”的状态。
   // 发送时变为 true，编辑器会变灰（不可用）。
@@ -145,7 +145,7 @@ export const Thread = ({ messageId, onCloseMessage }: ThreadProps) => {
       // 4. 发送消息 (使用准备好的 values)
       await createMessage(values, { throwError: true });
 
-      setEditorKey((prevKey) => prevKey + 1);
+      // setEditorKey((prevKey) => prevKey + 1);
     } catch (error) {
       //   console.log(error);
       toast.error("Failed to send message");
@@ -297,7 +297,11 @@ export const Thread = ({ messageId, onCloseMessage }: ThreadProps) => {
       </div>
       <div className="px-4">
         <Editor
-          key={editorKey}
+          // key={editorKey}
+          // 🔥🔥 3. 核心修复：key 只绑定 messageId
+          // 只有当你切换到另一个 Thread 时，才销毁组件
+          // 在同一个 Thread 发消息时，组件保持存活，isSubmittingRef 锁才能生效
+          key={messageId}
           onSubmit={handleSubmit}
           disabled={isPending}
           placeholder="Reply..."
@@ -305,6 +309,9 @@ export const Thread = ({ messageId, onCloseMessage }: ThreadProps) => {
           workspaceId={workspaceId}
           channelId={channelId}
           parentMessageId={messageId}
+          // 🔥🔥🔥 【新增】将 conversationId 传给编辑器
+          // 这样保存草稿时，后端才能知道这是属于哪个私聊的
+          conversationId={message.conversationId}
         />
       </div>
     </div>

@@ -1,3 +1,5 @@
+"use client";
+
 import { formatDistanceToNow } from "date-fns";
 import { MessageSquareText } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -7,7 +9,7 @@ import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { Id } from "../../convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// 1. 引入 ImagesGrid (注意路径，如果你的组件在 src/components 下)
+// 1. 引入 ImagesGrid
 import { ImagesGrid } from "@/components/thumbnail";
 
 const Renderer = dynamic(() => import("@/components/renderer"), { ssr: false });
@@ -15,7 +17,6 @@ const Renderer = dynamic(() => import("@/components/renderer"), { ssr: false });
 interface ThreadCardProps {
   messageId: Id<"messages">;
   body: string;
-  // 2. 改为接收图片数组
   images?: string[] | null;
   updatedAt: number;
   createdAt: number;
@@ -24,12 +25,18 @@ interface ThreadCardProps {
   channelId?: Id<"channels">;
   channelName?: string;
   replyCount?: number;
+
+  // 🔥🔥 2. 新增：接收私聊相关的 props
+  conversationId?: Id<"conversations">;
+  conversationName?: string;
+  // 🔥 1. 定义新 Prop
+  conversationMemberId?: Id<"members">;
 }
 
 export const ThreadCard = ({
   messageId,
   body,
-  images, // 接收数组
+  images,
   updatedAt,
   createdAt,
   authorName = "Member",
@@ -37,18 +44,31 @@ export const ThreadCard = ({
   channelId,
   channelName,
   replyCount,
+  // 🔥🔥 接收新参数
+  conversationId,
+  conversationName,
+  conversationMemberId, // 🔥 2. 接收
 }: ThreadCardProps) => {
   const router = useRouter();
   const workspaceId = useWorkspaceId();
 
   const handleOpenThread = () => {
-    if (!channelId) return;
-    router.push(
-      `/workspace/${workspaceId}/channel/${channelId}?parentMessageId=${messageId}`
-    );
+    if (channelId) {
+      router.push(
+        `/workspace/${workspaceId}/channel/${channelId}?parentMessageId=${messageId}`
+      );
+    } else if (conversationMemberId) {
+      // 🔥 3. 核心修复：这里必须跳转到 memberId，而不是 conversationId
+      router.push(
+        `/workspace/${workspaceId}/member/${conversationMemberId}?parentMessageId=${messageId}`
+      );
+    }
   };
 
   const avatarFallback = authorName.charAt(0).toUpperCase();
+
+  // 🔥🔥 核心逻辑：如果有 channelName 就显示 #Name，否则显示 conversationName
+  const title = channelName ? `#${channelName}` : conversationName || "Unknown";
 
   return (
     <div
@@ -57,8 +77,9 @@ export const ThreadCard = ({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          {/* 🔥🔥 修改：这里不再硬编码 unknown-channel */}
           <span className="font-bold text-sm hover:underline text-primary truncate max-w-[200px]">
-            #{channelName || "unknown-channel"}
+            {title}
           </span>
         </div>
         <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
@@ -92,8 +113,6 @@ export const ThreadCard = ({
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-transparent to-transparent group-hover:from-transparent/0" />
           </div>
 
-          {/* 3. 使用 ImagesGrid 替代原来的 img 标签 */}
-          {/* 这里传入空函数 onOpen，因为在 Thread 列表里点击图片通常期望是直接跳转到帖子，而不是弹窗查看大图 */}
           <ImagesGrid images={images} onOpen={() => {}} />
 
           {replyCount && replyCount > 0 && (

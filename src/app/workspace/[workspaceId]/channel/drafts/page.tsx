@@ -59,14 +59,26 @@ const DraftsPage = () => {
     );
   }
 
+  // 处理跳转逻辑
   const handleJump = (draft: any) => {
     if (!draft.targetId) return;
 
+    // 1. 基础路径：先判断是去频道还是去私聊
+    let path = "";
     if (draft.type === "channel") {
-      router.push(`/workspace/${workspaceId}/channel/${draft.targetId}`);
+      path = `/workspace/${workspaceId}/channel/${draft.targetId}`;
     } else {
-      router.push(`/workspace/${workspaceId}/member/${draft.targetId}`);
+      path = `/workspace/${workspaceId}/member/${draft.targetId}`;
     }
+
+    // 2. 核心修复：如果有 parentMessageId，说明这是个 Thread 回复
+    // 我们需要把它作为 query param 拼接到 URL 后面
+    if (draft.parentMessageId) {
+      path += `?parentMessageId=${draft.parentMessageId}`;
+    }
+
+    // 3. 执行跳转
+    router.push(path);
   };
 
   // 🔥🔥 3. 修改删除逻辑为异步，并调用自定义 confirm

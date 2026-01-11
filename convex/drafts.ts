@@ -1,18 +1,16 @@
-// convex/drafts.ts
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { auth } from "./auth";
-import { Doc, Id } from "./_generated/dataModel";
 
 // 定义通用的参数结构
 const draftArgs = {
   workspaceId: v.id("workspaces"),
   channelId: v.optional(v.id("channels")),
-  conversationId: v.optional(v.id("conversations")), // 🔥 新增
+  conversationId: v.optional(v.id("conversations")),
   parentMessageId: v.optional(v.id("messages")),
 };
 
-// 1. 读取草稿
+// 1. 读取草稿 (核心修复点)
 export const get = query({
   args: draftArgs,
   handler: async (ctx, args) => {
@@ -28,13 +26,18 @@ export const get = query({
 
     if (!member) return null;
 
-    // 🔥 逻辑分支：如果是私聊，查 conversation 索引；如果是频道，查 channel 索引
+    // ⬇️⬇️⬇️ 核心修复逻辑 ⬇️⬇️⬇️
+    // 无论查频道还是私聊，必须加 .filter 来精确匹配 parentMessageId
+    // 这样 "undefined" (主对话) 和 "id" (Thread) 就不会混淆了
+
     if (args.conversationId) {
       return await ctx.db
         .query("drafts")
         .withIndex("by_user_conversation", (q) =>
           q.eq("memberId", member._id).eq("conversationId", args.conversationId)
         )
+        // 🔥 严厉过滤：Thread ID 必须完全一致（包括 null/undefined）
+        .filter((q) => q.eq(q.field("parentMessageId"), args.parentMessageId))
         .first();
     } else {
       return await ctx.db
@@ -45,6 +48,8 @@ export const get = query({
             .eq("channelId", args.channelId)
             .eq("parentMessageId", args.parentMessageId)
         )
+        // 🔥 双重保险
+        .filter((q) => q.eq(q.field("parentMessageId"), args.parentMessageId))
         .first();
     }
   },
@@ -66,7 +71,7 @@ export const save = mutation({
 
     if (!member) throw new Error("Unauthorized");
 
-    // 查找现有草稿 (逻辑同 get)
+    // 查找现有草稿 (逻辑同 get，防止覆盖错误的草稿)
     let existingDraft;
     if (args.conversationId) {
       existingDraft = await ctx.db
@@ -74,6 +79,8 @@ export const save = mutation({
         .withIndex("by_user_conversation", (q) =>
           q.eq("memberId", member._id).eq("conversationId", args.conversationId)
         )
+        // 🔥 严厉过滤
+        .filter((q) => q.eq(q.field("parentMessageId"), args.parentMessageId))
         .first();
     } else {
       existingDraft = await ctx.db
@@ -91,6 +98,10 @@ export const save = mutation({
       await ctx.db.patch(existingDraft._id, {
         body: args.body,
         updatedAt: Date.now(),
+        // 强制同步 ID，保持数据完整
+        channelId: args.channelId,
+        conversationId: args.conversationId,
+        parentMessageId: args.parentMessageId,
       });
       return existingDraft._id;
     } else {
@@ -98,7 +109,7 @@ export const save = mutation({
         workspaceId: args.workspaceId,
         memberId: member._id,
         channelId: args.channelId,
-        conversationId: args.conversationId, // 🔥
+        conversationId: args.conversationId,
         parentMessageId: args.parentMessageId,
         body: args.body,
         updatedAt: Date.now(),
@@ -123,16 +134,19 @@ export const remove = mutation({
 
     if (!member) throw new Error("Unauthorized");
 
-    let draft;
+    // 删除时也要精确打击，防止误删 Thread 的草稿
+    let drafts = [];
     if (args.conversationId) {
-      draft = await ctx.db
+      drafts = await ctx.db
         .query("drafts")
         .withIndex("by_user_conversation", (q) =>
           q.eq("memberId", member._id).eq("conversationId", args.conversationId)
         )
-        .first();
+        // 🔥 严厉过滤
+        .filter((q) => q.eq(q.field("parentMessageId"), args.parentMessageId))
+        .collect();
     } else {
-      draft = await ctx.db
+      drafts = await ctx.db
         .query("drafts")
         .withIndex("by_user_channel", (q) =>
           q
@@ -140,27 +154,22 @@ export const remove = mutation({
             .eq("channelId", args.channelId)
             .eq("parentMessageId", args.parentMessageId)
         )
-        .first();
+        .collect();
     }
 
-    if (draft) {
+    for (const draft of drafts) {
       await ctx.db.delete(draft._id);
     }
   },
 });
 
-// 🔥🔥 新增：获取当前工作区所有草稿，并填充名称
+// 4. 获取所有草稿 (列表页用 - 带智能名称回退)
 export const getDrafts = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
-    // 1. 修正 Auth 调用：使用你项目中现有的 auth.getUserId
     const userId = await auth.getUserId(ctx);
+    if (!userId) return [];
 
-    if (!userId) {
-      return [];
-    }
-
-    // 2. 修正逻辑：先找到当前用户在这个 workspace 的 member 身份
     const member = await ctx.db
       .query("members")
       .withIndex("by_workspace_id_user_id", (q) =>
@@ -168,12 +177,8 @@ export const getDrafts = query({
       )
       .first();
 
-    if (!member) {
-      return [];
-    }
+    if (!member) return [];
 
-    // 3. 修正查询：用 memberId 去查 drafts 表
-    // 这里利用你在 schema 里定义的 "by_workspace_member" 索引
     const drafts = await ctx.db
       .query("drafts")
       .withIndex("by_workspace_member", (q) =>
@@ -181,7 +186,6 @@ export const getDrafts = query({
       )
       .collect();
 
-    // 4. 填充 Channel 或 Conversation 名称 (这部分逻辑大体没变，只是为了完整性贴在这里)
     const draftsWithInfo = await Promise.all(
       drafts.map(async (draft) => {
         let name = "Untitled";
@@ -197,7 +201,6 @@ export const getDrafts = query({
           type = "conversation";
           const conversation = await ctx.db.get(draft.conversationId);
           if (conversation) {
-            // 找到私聊对象
             const otherMemberId =
               conversation.memberOneId === member._id
                 ? conversation.memberTwoId
@@ -207,7 +210,19 @@ export const getDrafts = query({
             if (otherMember) {
               const otherUser = await ctx.db.get(otherMember.userId);
               name = otherUser?.name || "User";
-              targetId = otherMember._id; // 跳转私聊通常用 MemberId
+              targetId = otherMember._id;
+            }
+          }
+        } else if (draft.parentMessageId) {
+          // 智能回退：如果是回复旧消息的草稿，尝试找父消息作者名
+          type = "conversation";
+          const parentMessage = await ctx.db.get(draft.parentMessageId);
+          if (parentMessage) {
+            const parentMember = await ctx.db.get(parentMessage.memberId);
+            if (parentMember) {
+              const parentUser = await ctx.db.get(parentMember.userId);
+              name = parentUser?.name || "Member";
+              targetId = parentMember._id;
             }
           }
         }

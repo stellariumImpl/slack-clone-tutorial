@@ -39,9 +39,7 @@ const ThreadsPage = () => {
     return () => observer.disconnect();
   }, [status, loadMore]);
 
-  // ----------------------------------------------------------------------
-  // 1. 复用 Channel 页面的 Loading 样式 (紫色背景)
-  // ----------------------------------------------------------------------
+  // 1. Loading State
   if (status === "LoadingFirstPage") {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#5d33a8]">
@@ -55,22 +53,13 @@ const ThreadsPage = () => {
     );
   }
 
-  // ----------------------------------------------------------------------
-  // 2. 复用 Channel 页面的主布局 (flex flex-col h-full)
-  // ----------------------------------------------------------------------
   return (
     <div className="flex flex-col h-full">
-      {/* 头部 Header 
-         这里手动写了一个和 Channel Header 高度一致的头部 (h-[49px])
-         因为原来的 Header 组件可能绑定了特定的 Channel 逻辑，这里只需要显示标题
-      */}
       <div className="flex items-center justify-between px-4 h-[49px] border-b bg-white">
         <span className="text-lg font-bold">Threads</span>
       </div>
 
-      {/* 列表区域：去掉了原来的 margin, shadow, rounded，让它铺满 */}
       <div className="flex-1 overflow-y-auto messages-scrollbar pb-4">
-        {/* 数据列表 */}
         {results?.map((message) => (
           <ThreadCard
             key={message._id}
@@ -81,13 +70,21 @@ const ThreadsPage = () => {
             createdAt={message._creationTime}
             authorName={message.user?.name}
             authorImage={message.user?.image}
+            // --------------------------------------------------------
+            // 🔥 核心修复：把 null 转为 undefined，解决红线报错
+            // --------------------------------------------------------
             channelId={message.channelId}
-            channelName={message.channelName}
+            channelName={message.channelName ?? undefined} // Fix here
             replyCount={message.replyCount}
+            conversationId={message.conversationId}
+            conversationName={message.conversationName ?? undefined} // Fix here
+            // 🔥🔥 核心修复：把可能为 null 的 ID 转换为 undefined
+            conversationMemberId={message.conversationMemberId ?? undefined}
+
+            // --------------------------------------------------------
           />
         ))}
 
-        {/* 无数据空状态 */}
         {status === "Exhausted" && results?.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-10">
             <p>No threads found.</p>
@@ -97,10 +94,8 @@ const ThreadsPage = () => {
           </div>
         )}
 
-        {/* 底部观察点 */}
         <div className="h-1" ref={observerRef} />
 
-        {/* 加载更多 Loading */}
         {status === "LoadingMore" && (
           <div className="text-center my-2 relative">
             <hr className="absolute top-1/2 left-0 right-0 border-t border-gray-300" />

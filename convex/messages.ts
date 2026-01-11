@@ -114,12 +114,6 @@ export const update = mutation({
       throw new Error("Message not found");
     }
 
-    // const member = await getMember(ctx, message.workspaceId, userId);
-    // if (!member || member._id !== message.memberId) {
-    //   throw new Error("Member not found");
-    // }
-    // 太严格了 我们把规则拆开
-
     const member = await getMember(ctx, message.workspaceId, userId);
     if (!member) {
       throw new Error("Unauthorized");
@@ -493,68 +487,84 @@ export const getThreads = query({
     const userId = await auth.getUserId(ctx);
     if (!userId) return { page: [], isDone: false, continueCursor: "" };
 
-    const member = await getMember(ctx, args.workspaceId, userId);
-    if (!member) return { page: [], isDone: false, continueCursor: "" };
+    // 🔥 1. 重命名：把外层的 member 改名为 currentMember，防止变量覆盖
+    const currentMember = await getMember(ctx, args.workspaceId, userId);
+    if (!currentMember) return { page: [], isDone: false, continueCursor: "" };
 
-    // // 🔍 【DEBUG 1】打印查询条件
-    // console.log(
-    //   "👉 [Backend] getThreads called for Workspace:",
-    //   args.workspaceId
-    // );
-
-    // 利用新索引查询：查该 Workspace 下所有有 lastReplyAt 值的消息，按时间倒序
     const results = await ctx.db
       .query("messages")
       .withIndex("by_workspace_id_last_reply_at", (q) =>
         q.eq("workspaceId", args.workspaceId)
       )
-      .order("desc") // 最新的回复排前面
+      .order("desc")
       .paginate(args.paginationOpts);
-
-    // // 🔍 【DEBUG 2】打印查到的原始数据条数
-    // console.log("👉 [Backend] Raw results count:", results.page.length);
-    // if (results.page.length > 0) {
-    //   console.log("👉 [Backend] First item sample:", results.page[0]);
-    // }
 
     return {
       ...results,
       page: (
         await Promise.all(
           results.page.map(async (message) => {
-            // 过滤掉没有回复的普通消息 (理论上 index 应该只包含有值的，但双重保险)
             if (!message.lastReplyAt) {
-              // // 🔍 【DEBUG 3】检查每一条消息是否有 lastReplyAt
-              // console.log(
-              //   "⚠️ [Backend] Skipping message because no lastReplyAt:",
-              //   message._id
-              // );
               return null;
             }
 
+            // 这里的 member 是消息的发送者
             const member = await populateMember(ctx, message.memberId);
             const user = member ? await populateUser(ctx, member.userId) : null;
 
             if (!member || !user) return null;
 
-            // 获取 Channel 信息，用于 UI 显示 "#General" 并跳转
-            const channel = message.channelId
-              ? await ctx.db.get(message.channelId)
-              : null;
+            // --- 🔥🔥 核心修改开始 ---
 
-            // 核心修复：把 Storage ID 转换成 URL
+            let channelName = null;
+            let conversationName = null;
+            let conversationImage = null;
+            let conversationMemberId = null; // 1。。。。。新增这个变量
+
+            // 情况 A: 这是一个频道消息
+            if (message.channelId) {
+              const channel = await ctx.db.get(message.channelId);
+              channelName = channel?.name;
+            }
+            // 情况 B: 这是一个私聊消息
+            else if (message.conversationId) {
+              const conversation = await ctx.db.get(message.conversationId);
+              if (conversation) {
+                // 找出私聊的“另一方”是谁
+                // 使用 currentMember._id 来对比
+                const otherMemberId =
+                  conversation.memberOneId === currentMember._id
+                    ? conversation.memberTwoId
+                    : conversation.memberOneId;
+
+                const otherMember = await ctx.db.get(otherMemberId);
+                if (otherMember) {
+                  const otherUser = await ctx.db.get(otherMember.userId);
+                  conversationName = otherUser?.name;
+                  conversationImage = otherUser?.image;
+                  // 2。。。。。。。赋值给变量
+                  conversationMemberId = otherMember._id;
+                }
+              }
+            }
+            // --- 🔥🔥 核心修改结束 ---
+
             const images = await Promise.all(
               (message.images || []).map(async (imageId) => {
                 return await ctx.storage.getUrl(imageId);
               })
             );
+
             return {
               ...message,
               member,
               user,
-              channel,
-              channelName: channel?.name,
-              // 用生成的 URL 数组覆盖掉原来的 ID 数组
+              // 返回新字段
+              channelName,
+              conversationName,
+              conversationImage,
+              // 🔥🔥 3. 重点：必须在 return 对象里把这个字段传出去
+              conversationMemberId,
               images: images.filter((url): url is string => url !== null),
             };
           })
@@ -563,32 +573,3 @@ export const getThreads = query({
     };
   },
 });
-
-// 这是一个一次性工具，用来修复旧数据
-// export const backfillThreadData = mutation({
-//   args: {},
-//   handler: async (ctx) => {
-//     // 1. 查出所有的消息
-//     const allMessages = await ctx.db.query("messages").collect();
-
-//     let count = 0;
-
-//     for (const msg of allMessages) {
-//       // 如果这条消息有 parentMessageId，说明它是一条回复
-//       if (msg.parentMessageId) {
-//         // 找到它的父消息
-//         const parent = await ctx.db.get(msg.parentMessageId);
-//         if (parent) {
-//           // 更新父消息的 lastReplyAt 和 replyCount
-//           await ctx.db.patch(parent._id, {
-//             lastReplyAt: msg._creationTime, // 简单起见，用最近一条回复的时间覆盖
-//             replyCount: (parent.replyCount || 0) + 1,
-//           });
-//           count++;
-//         }
-//       }
-//     }
-
-//     return `Fixed ${count} threads!`;
-//   },
-// });
