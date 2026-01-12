@@ -5,12 +5,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogClose,
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { TrashIcon } from "lucide-react";
+import { TrashIcon, Video } from "lucide-react"; // 🔥 1. 引入 Video 图标
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
@@ -25,9 +24,10 @@ import { useCurrentMember } from "@/features/members/api/use-current-member";
 
 interface HeaderProps {
   name: string;
+  onCall?: () => void; // 🔥 2. 新增 onCall 类型定义
 }
 
-export const Header = ({ name }: HeaderProps) => {
+export const Header = ({ name, onCall }: HeaderProps) => {
   const workspaceId = useWorkspaceId();
   const router = useRouter();
   const [value, setValue] = useState(name);
@@ -40,7 +40,6 @@ export const Header = ({ name }: HeaderProps) => {
     "You are about to delete this channel. This action is irreversible."
   );
 
-  // 从create-channel-modal.tsx中复制来的
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\s+/g, "-").toLowerCase();
     setValue(value);
@@ -93,92 +92,105 @@ export const Header = ({ name }: HeaderProps) => {
   };
 
   return (
-    <div className="bg-white border-b h-[49px] flex items-center px-4 overflow-hidden">
-      <ConfirmDialog />
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            className="text-lg font-semibold px-2 overflow-hidden w-auto"
-            size="sm"
-          >
-            <span className="truncate"># {name}</span>
-            <FaChevronDown className="size-2.5 ml-2" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="p-0 bg-gray-50 overflow-hidden">
-          <DialogHeader className="p-4 border-b bg-white">
-            <DialogTitle># {name}</DialogTitle>
-          </DialogHeader>
-          <div className="px-4 pb-4 flex flex-col gap-y-2">
-            <Dialog open={editOpen} onOpenChange={handleEditOpen}>
-              <DialogTrigger asChild>
-                <div className="px-5 py-4 bg-white rounded-lg border cursor-pointer hover:bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">Channel name</p>
-                    {currentMember?.role === "admin" && (
-                      <p className="text-sm text-[#5d33a8] hover:underline font-semibold hover:text-[#4a2885] transition-colors">
-                        Edit
-                      </p>
-                    )}
+    <div className="bg-white border-b h-[49px] flex items-center px-4 overflow-hidden justify-between">
+      {/* 左侧：标题和编辑弹窗 */}
+      <div className="flex items-center">
+        <ConfirmDialog />
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              className="text-lg font-semibold px-2 overflow-hidden w-auto"
+              size="sm"
+            >
+              <span className="truncate"># {name}</span>
+              <FaChevronDown className="size-2.5 ml-2" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="p-0 bg-gray-50 overflow-hidden">
+            <DialogHeader className="p-4 border-b bg-white">
+              <DialogTitle># {name}</DialogTitle>
+            </DialogHeader>
+            <div className="px-4 pb-4 flex flex-col gap-y-2">
+              <Dialog open={editOpen} onOpenChange={handleEditOpen}>
+                <DialogTrigger asChild>
+                  <div className="px-5 py-4 bg-white rounded-lg border cursor-pointer hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold">Channel name</p>
+                      {currentMember?.role === "admin" && (
+                        <p className="text-sm text-[#5d33a8] hover:underline font-semibold hover:text-[#4a2885] transition-colors">
+                          Edit
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500"># {name}</p>
                   </div>
-                  <p className="text-sm text-gray-500"># {name}</p>
-                </div>
-              </DialogTrigger>
-              {/* --- 修改开始：重命名弹窗样式 --- */}
-              <DialogContent className="p-0 bg-white overflow-hidden max-w-md gap-0 text-black">
-                <DialogHeader className="p-6 bg-gray-50 border-b border-gray-100">
-                  <DialogTitle className="font-bold text-lg">
-                    Rename this channel
-                  </DialogTitle>
-                </DialogHeader>
+                </DialogTrigger>
+                <DialogContent className="p-0 bg-white overflow-hidden max-w-md gap-0 text-black">
+                  <DialogHeader className="p-6 bg-gray-50 border-b border-gray-100">
+                    <DialogTitle className="font-bold text-lg">
+                      Rename this channel
+                    </DialogTitle>
+                  </DialogHeader>
 
-                <form className="space-y-4 p-6" onSubmit={handleSubmit}>
-                  <Input
-                    value={value}
-                    disabled={isUpdateChannelPending}
-                    onChange={handleChange}
-                    required
-                    autoFocus
-                    minLength={3}
-                    maxLength={80}
-                    placeholder="e.g. plan-budget"
-                    className="h-10 text-base border-gray-300 focus-visible:ring-offset-0 focus-visible:ring-[#5d33a8]/20 focus-visible:border-[#5d33a8]"
-                  />
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button
-                        variant="outline"
-                        disabled={isUpdateChannelPending}
-                        className="cursor-pointer text-gray-600 border-gray-300 hover:bg-gray-50"
-                      >
-                        Cancel
-                      </Button>
-                    </DialogClose>
-                    <Button
+                  <form className="space-y-4 p-6" onSubmit={handleSubmit}>
+                    <Input
+                      value={value}
                       disabled={isUpdateChannelPending}
-                      className="cursor-pointer bg-[#5d33a8] hover:bg-[#4a2885] text-white"
-                    >
-                      Save changes
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-              {/* --- 修改结束 --- */}
-            </Dialog>
-            {currentMember?.role === "admin" && (
-              <button
-                onClick={handleRemove}
-                disabled={isRemoveChannelPending}
-                className="flex items-center gap-x-2 px-5 py-4 bg-white rounded-lg cursor-pointer border hover:bg-gray-50 text-rose-600"
-              >
-                <TrashIcon className="size-4" />
-                <p className="text-sm font-semibold">Delete channel</p>
-              </button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+                      onChange={handleChange}
+                      required
+                      autoFocus
+                      minLength={3}
+                      maxLength={80}
+                      placeholder="e.g. plan-budget"
+                      className="h-10 text-base border-gray-300 focus-visible:ring-offset-0 focus-visible:ring-[#5d33a8]/20 focus-visible:border-[#5d33a8]"
+                    />
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button
+                          variant="outline"
+                          disabled={isUpdateChannelPending}
+                          className="cursor-pointer text-gray-600 border-gray-300 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </Button>
+                      </DialogClose>
+                      <Button
+                        disabled={isUpdateChannelPending}
+                        className="cursor-pointer bg-[#5d33a8] hover:bg-[#4a2885] text-white"
+                      >
+                        Save changes
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              {currentMember?.role === "admin" && (
+                <button
+                  onClick={handleRemove}
+                  disabled={isRemoveChannelPending}
+                  className="flex items-center gap-x-2 px-5 py-4 bg-white rounded-lg cursor-pointer border hover:bg-gray-50 text-rose-600"
+                >
+                  <TrashIcon className="size-4" />
+                  <p className="text-sm font-semibold">Delete channel</p>
+                </button>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* 🔥 3. 右侧：视频通话按钮 */}
+      {onCall && (
+        <Button
+          onClick={onCall}
+          variant="ghost"
+          size="iconSm"
+          className="text-muted-foreground hover:text-[#5d33a8]"
+        >
+          <Video className="size-5" />
+        </Button>
+      )}
     </div>
   );
 };
