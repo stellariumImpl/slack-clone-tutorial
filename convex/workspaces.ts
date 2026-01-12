@@ -261,17 +261,72 @@ export const remove = mutation({
       throw new Error("Unauthorized");
     }
 
-    const [members] = await Promise.all([
-      ctx.db
-        .query("members")
-        .withIndex("by_workspace_id", (q) => q.eq("workspaceId", args.id))
-        .collect(),
-    ]);
+    // 🔥 核心修改：级联删除所有相关数据
 
+    const [members, channels, conversations, messages, reactions] =
+      await Promise.all([
+        // 1. 获取所有成员
+        ctx.db
+          .query("members")
+          .withIndex("by_workspace_id", (q) => q.eq("workspaceId", args.id))
+          .collect(),
+        // 2. 获取所有频道
+        ctx.db
+          .query("channels")
+          .withIndex("by_workspace_id", (q) => q.eq("workspaceId", args.id))
+          .collect(),
+        // 3. 获取所有私聊会话
+        ctx.db
+          .query("conversations")
+          .withIndex("by_workspace_id", (q) => q.eq("workspaceId", args.id))
+          .collect(),
+        // 4. 获取所有消息 (用于删除文件)
+        ctx.db
+          .query("messages")
+          .withIndex("by_workspace_id", (q) => q.eq("workspaceId", args.id))
+          .collect(),
+        // 5. 获取所有 Reactions
+        ctx.db
+          .query("reactions")
+          .withIndex("by_workspace_id", (q) => q.eq("workspaceId", args.id))
+          .collect(),
+      ]);
+
+    // 删除成员
     for (const member of members) {
       await ctx.db.delete(member._id);
     }
 
+    // 删除频道
+    for (const channel of channels) {
+      await ctx.db.delete(channel._id);
+    }
+
+    // 删除私聊
+    for (const conversation of conversations) {
+      await ctx.db.delete(conversation._id);
+    }
+
+    // 删除消息和关联的 Storage 文件
+    for (const message of messages) {
+      if (message.images) {
+        for (const imageId of message.images) {
+          try {
+            await ctx.storage.delete(imageId);
+          } catch (e) {
+            console.error(`Failed to delete storage ${imageId}`, e);
+          }
+        }
+      }
+      await ctx.db.delete(message._id);
+    }
+
+    // 删除 Reactions
+    for (const reaction of reactions) {
+      await ctx.db.delete(reaction._id);
+    }
+
+    // 最后删除工作区
     await ctx.db.delete(args.id);
 
     return args.id;

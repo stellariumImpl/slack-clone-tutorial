@@ -17,11 +17,13 @@ import { useState } from "react";
 interface WorkspaceHeaderProps {
   workspace: Doc<"workspaces">;
   isAdmin: boolean;
+  onSearchClick: () => void; // 🔥 只保留这一个回调
 }
 
 export const WorkspaceHeader = ({
   workspace,
   isAdmin,
+  onSearchClick,
 }: WorkspaceHeaderProps) => {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -82,17 +84,16 @@ export const WorkspaceHeader = ({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
         <div className="flex items-center gap-0.5">
+          {/* 🔥 只保留这个 Filter 按钮，但功能是打开 Search */}
           <Hint label="Filter" side="bottom">
-            <Button variant="transparent" size="iconSm">
+            <Button variant="transparent" size="iconSm" onClick={onSearchClick}>
               <ListFilter className="size-4" />
             </Button>
           </Hint>
-          <Hint label="New message" side="bottom">
-            <Button variant="transparent" size="iconSm">
-              <SquarePen className="size-4" />
-            </Button>
-          </Hint>
+
+          {/* SquarePen 按钮已删除 */}
         </div>
       </div>
     </>

@@ -4,6 +4,9 @@ import { auth } from "./auth";
 import { Id, Doc } from "./_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 
+// 🔥 1. 引入 internal，用于调用 search.ts
+import { internal } from "./_generated/api";
+
 const populateThread = async (ctx: QueryCtx, messageId: Id<"messages">) => {
   const messages = await ctx.db
     .query("messages")
@@ -93,6 +96,11 @@ export const remove = mutation({
 
     await ctx.db.delete(args.id);
 
+    // 🔥 2. 删除同步：从 Algolia 移除该消息
+    await ctx.scheduler.runAfter(0, internal.search.unindexMessage, {
+      id: args.id,
+    });
+
     return args.id;
   },
 });
@@ -176,6 +184,32 @@ export const update = mutation({
       ...(args.callDuration ? { callDuration: args.callDuration } : {}),
       updatedAt: Date.now(),
     });
+
+    // 🔥 3. 更新同步：如果是修改了内容，需要同步到 Algolia
+    if (args.body) {
+      const msg = await ctx.db.get(args.id);
+      if (msg) {
+        // 获取原作者信息（即便修改者是 Admin，作者名还是原作者）
+        const authorMember = await ctx.db.get(msg.memberId);
+        const authorUser = authorMember
+          ? await ctx.db.get(authorMember.userId)
+          : null;
+
+        if (authorUser) {
+          await ctx.scheduler.runAfter(0, internal.search.indexMessage, {
+            id: args.id,
+            body: args.body,
+            workspaceId: msg.workspaceId,
+            channelId: msg.channelId,
+            memberName: authorUser.name || "Member",
+            updatedAt: Date.now(),
+            // 🔥 新增传参 (从 msg 对象里取)
+            conversationId: msg.conversationId,
+            parentMessageId: msg.parentMessageId,
+          });
+        }
+      }
+    }
 
     return args.id;
   },
@@ -469,6 +503,24 @@ export const create = mutation({
           lastReplyAt: Date.now(),
         });
       }
+    }
+
+    // 🔥 4. 创建同步：将新消息推送到 Algolia
+    // create 时 member 变量就是当前发送者，直接获取其 user 信息
+    const user = await ctx.db.get(member.userId);
+
+    if (user) {
+      await ctx.scheduler.runAfter(0, internal.search.indexMessage, {
+        id: messageId,
+        body: args.body,
+        workspaceId: args.workspaceId,
+        channelId: args.channelId,
+        memberName: user.name || "Member",
+        updatedAt: Date.now(),
+        // 🔥 新增传参
+        conversationId: _conversationId,
+        parentMessageId: args.parentMessageId,
+      });
     }
 
     return messageId;
