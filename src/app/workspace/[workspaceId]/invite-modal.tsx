@@ -5,10 +5,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
-import { CopyIcon, RefreshCcw } from "lucide-react";
+import { CopyIcon, RefreshCcw, Check } from "lucide-react"; // 新增 Check 图标
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -31,21 +30,16 @@ export const InviteModal = ({
   const workspaceId = useWorkspaceId();
   const { mutate, isPending } = useNewJoinCode();
 
-  // 1. 自动刷新倒计时 (30s)
+  // === 原有逻辑保持不变 ===
   const [timeLeft, setTimeLeft] = useState(30);
-  // 2. 控制图标旋转
   const [isManualLoading, setIsManualLoading] = useState(false);
-
-  // 3. 点击次数计数
   const [clickCount, setClickCount] = useState(0);
-  // 4. 是否触发了“冷却惩罚”
   const [isRateLimited, setIsRateLimited] = useState(false);
-  // 5. 新增：惩罚倒计时 (默认10秒)
   const [cooldownTimer, setCooldownTimer] = useState(10);
 
-  // ------------------------------------------------------------
-  // 逻辑 A: 自动刷新 (Authenticator 模式)
-  // ------------------------------------------------------------
+  // === 新增：控制复制 Code 的成功状态 ===
+  const [isCopied, setIsCopied] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     const timer = setInterval(() => {
@@ -56,7 +50,6 @@ export const InviteModal = ({
             {
               onSuccess: () => {},
               onError: (error) => {
-                // 忽略 Too fast 错误
                 if (
                   error.message !==
                   "You are doing that too fast. Please wait a moment."
@@ -74,31 +67,22 @@ export const InviteModal = ({
     return () => clearInterval(timer);
   }, [open, workspaceId, mutate]);
 
-  // ------------------------------------------------------------
-  // 逻辑 B: 冷却惩罚倒计时 (动态 10s -> 0s)
-  // ------------------------------------------------------------
   useEffect(() => {
-    // 只有在触发限制时才运行这个计时器
     if (isRateLimited) {
       const timer = setInterval(() => {
         setCooldownTimer((prev) => {
           if (prev <= 1) {
-            // 倒计时结束：解除锁定，重置状态
             setIsRateLimited(false);
             setClickCount(0);
-            return 10; // 重置回 10 供下次使用
+            return 10;
           }
           return prev - 1;
         });
       }, 1000);
-
       return () => clearInterval(timer);
     }
   }, [isRateLimited]);
 
-  // ------------------------------------------------------------
-  // 逻辑 C: 3秒无操作自动清除点击次数
-  // ------------------------------------------------------------
   useEffect(() => {
     if (clickCount > 0 && clickCount < 3 && !isRateLimited) {
       const timer = setTimeout(() => {
@@ -108,18 +92,25 @@ export const InviteModal = ({
     }
   }, [clickCount, isRateLimited]);
 
+  // === 新增：点击复制 Code 的处理函数 ===
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(joinCode).then(() => {
+      setIsCopied(true);
+      toast.success("Invite code copied to clipboard");
+      setTimeout(() => setIsCopied(false), 2000); // 2秒后重置状态
+    });
+  };
+
   const handleNewJoinCode = () => {
     if (isRateLimited) return;
 
     const newCount = clickCount + 1;
     setClickCount(newCount);
 
-    // 触发惩罚
     if (newCount >= 3) {
       setIsRateLimited(true);
-      setCooldownTimer(10); // 确保从 10 开始倒数
+      setCooldownTimer(10);
       toast.error("You are doing that too fast. Please wait 10s.");
-      // 注意：这里不再需要 setTimeout，上面的 useEffect 会负责倒计时和解锁
     }
 
     setIsManualLoading(true);
@@ -140,7 +131,7 @@ export const InviteModal = ({
     );
   };
 
-  const handleCopy = () => {
+  const handleCopyLink = () => {
     const inviteLink = `${window.location.origin}/join/${workspaceId}`;
     navigator.clipboard.writeText(inviteLink).then(() => {
       toast.success("Link copied to clipboard");
@@ -161,11 +152,13 @@ export const InviteModal = ({
         </DialogHeader>
 
         <div className="p-6 flex flex-col gap-y-6">
+          {/* 原有卡片结构保持完全一致，仅修改中间文字部分 */}
           <div className="px-5 py-4 bg-white rounded-lg border border-gray-200 flex flex-col gap-y-2">
             <div className="flex items-center justify-between w-full">
               <p className="text-sm font-bold text-gray-900">Invite Code</p>
+              {/* 这里是复制链接，保持原样 */}
               <Button
-                onClick={handleCopy}
+                onClick={handleCopyLink}
                 variant="ghost"
                 size="sm"
                 className="text-xs font-semibold text-[#5d33a8] hover:text-[#4a2885] hover:bg-transparent h-auto p-0"
@@ -175,9 +168,41 @@ export const InviteModal = ({
               </Button>
             </div>
 
-            <p className="text-4xl font-bold tracking-widest uppercase text-black mt-2">
-              {joinCode}
-            </p>
+            {/* === 修改开始：局部增强 Invite Code 显示区域 === */}
+            <div
+              onClick={handleCopyCode}
+              className="flex items-center gap-x-2 mt-2 cursor-pointer group"
+              title="Click to copy code"
+            >
+              {/* 创意点：
+                 1. transition-colors: 颜色平滑过渡
+                 2. group-hover: 鼠标放上去时略微变色提示可点击
+                 3. active:scale-95: 点击时的按压反馈
+              */}
+              <p
+                className={cn(
+                  "text-4xl font-bold tracking-widest uppercase transition-all duration-300",
+                  isCopied
+                    ? "text-green-600 scale-105" // 成功状态：绿色 + 轻微放大
+                    : "text-black group-hover:text-gray-500 group-active:scale-95" // 普通交互：灰色提示 + 按压缩小
+                )}
+              >
+                {joinCode}
+              </p>
+
+              {/* 创意点：状态图标
+                 平时隐藏 (opacity-0)，Hover时显示 Copy 图标，
+                 复制成功后变为 Check 图标并旋转进入
+              */}
+              <div className="size-6 relative ml-1">
+                {isCopied ? (
+                  <Check className="size-5 absolute top-1 left-0 text-green-600 animate-in fade-in zoom-in spin-in-90 duration-300" />
+                ) : (
+                  <CopyIcon className="size-5 absolute top-1 left-0 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                )}
+              </div>
+            </div>
+            {/* === 修改结束 === */}
 
             <div className="flex items-center gap-x-2 mt-1">
               <div className="size-2 rounded-full bg-green-500 animate-pulse" />
@@ -194,7 +219,6 @@ export const InviteModal = ({
               variant="outline"
               className="cursor-pointer border-gray-200 text-gray-600 hover:bg-gray-50 w-full"
             >
-              {/* 动态显示 cooldownTimer */}
               {isRateLimited ? `Wait ${cooldownTimer}s` : "New Code"}
 
               {!isRateLimited && (
