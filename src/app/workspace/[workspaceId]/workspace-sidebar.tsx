@@ -125,7 +125,7 @@ export const WorkspaceSidebar = () => {
         label="Direct Messages"
         hint="New direct message"
         // 点击加号也可以打开搜索弹窗，方便用户
-        onNew={() => setSearchOpen(true)}
+        // onNew={() => setSearchOpen(true)}
       >
         {/* 🔥 直接渲染 members */}
         {members?.map((item) => (
