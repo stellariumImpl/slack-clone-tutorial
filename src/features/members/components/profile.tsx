@@ -234,7 +234,7 @@ export const Profile = ({ memberId, onClose }: ProfileProps) => {
             </div>
           ) : null}
 
-          <div className="px-4">
+          <div className="px-6">
             <Separator className="bg-gray-200" />
           </div>
 
