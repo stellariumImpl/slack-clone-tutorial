@@ -44,10 +44,16 @@ export const WorkspaceSwitcher = () => {
       <DropdownMenuContent side="bottom" align="start" className="w-64">
         <DropdownMenuItem
           onClick={() => router.push(`/workspace/${workspaceId}`)}
-          className="cursor-pointer flex-col justify-start items-start capitalize inline-block max-w-[246px] align-bottom truncate"
+          // 1. 移除 inline-block，使用 flex 布局
+          // 2. 增加 pl-2 (左内边距) 让文字远离边缘
+          className="cursor-pointer flex flex-col justify-start items-start capitalize pl-3 py-2"
         >
-          {workspace?.name}
-          <span className="text-xs text-muted-foreground">
+          {/* 使用 span 或 div 包裹名称，防止 truncate 失效 */}
+          <div className="text-sm font-semibold truncate w-full">
+            {workspace?.name}
+          </div>
+
+          <span className="text-xs text-muted-foreground mt-0.5">
             Active workspace
           </span>
         </DropdownMenuItem>
