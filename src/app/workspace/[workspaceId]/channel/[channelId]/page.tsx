@@ -71,26 +71,35 @@ const ChannelIdPage = () => {
   const handleCallEnd = async (shouldEndCall: boolean) => {
     setVideoOpen(false);
 
-    const messageId = callMessageIdRef.current;
+    // 1. 获取要更新的目标消息 ID
+    // 逻辑：优先用本地引用的 ID，如果刷新丢了，就从当前消息列表里找最后一条还没结束的 call 消息
+    const activeCallMessage = results?.find(
+      (m) => m.type === "call" && !m.callDuration
+    );
+    const targetMessageId = callMessageIdRef.current || activeCallMessage?._id;
+
     const startTime = callStartTimeRef.current;
 
-    // 只有当 shouldEndCall 为 true (点击挂断) 时，才更新数据库显示时长
-    if (shouldEndCall && messageId && startTime) {
-      const duration = Date.now() - startTime;
+    // 2. 执行“原地更新”
+    if (shouldEndCall && targetMessageId) {
+      const duration = startTime ? Date.now() - startTime : 0;
       const seconds = Math.floor(duration / 1000);
-      const formatTime = `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
+      const formatTime = `${Math.floor(seconds / 60)}m ${(seconds % 60).toString().padStart(2, "0")}s`;
 
       try {
+        // 🔥 注意：这里是调用 updateMutation，而不是 createMutation
         await updateMessage({
-          id: messageId,
-          callDuration: duration,
-          body: `🎥 Call ended - Duration: ${formatTime}`,
+          id: targetMessageId as Id<"messages">,
+          callDuration: duration > 0 ? duration : 1000, // 至少记录1秒
+          body: "🎥 Video call ended", // 更新 body 内容
         });
+        console.log("通话状态已在原消息更新");
       } catch (error) {
-        console.error("Failed to update call duration:", error);
+        console.error("更新通话时长失败:", error);
       }
     }
 
+    // 3. 重置状态，准备下一次通话
     callStartTimeRef.current = null;
     callMessageIdRef.current = null;
   };
