@@ -3,38 +3,32 @@
 import {
   LiveKitRoom,
   VideoConference,
-  useRemoteParticipants, // 1. 引入这个 Hook
+  useRemoteParticipants,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { useEffect, useState, useRef } from "react"; // 引入 useRef
+import { useEffect, useState, useRef } from "react";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { Minimize2, Maximize2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface VideoModalProps {
   roomName: string;
   userName: string;
-  // 2. 修改 onClose 类型，允许传回一个布尔值
-  // true = 真的结束了 (我是最后一个人)
-  // false = 还有人在 (我只是退出了)
   onClose: (shouldEndCall: boolean) => void;
 }
 
-// 3. 创建一个内部组件来监听人数
-// 因为 useRemoteParticipants 必须在 LiveKitRoom 内部使用
 const RoomTracker = ({
   onLeaveRef,
 }: {
   onLeaveRef: React.MutableRefObject<boolean>;
 }) => {
   const remoteParticipants = useRemoteParticipants();
-
   useEffect(() => {
-    // 如果远程还有人 (length > 0)，说明我不是最后一个，onLeaveRef 设为 false
-    // 如果远程没人 (length === 0)，说明我是最后一个，onLeaveRef 设为 true
     onLeaveRef.current = remoteParticipants.length === 0;
   }, [remoteParticipants, onLeaveRef]);
-
-  return null; // 这个组件不渲染任何东西，只负责逻辑
+  return null;
 };
 
 export default function VideoModal({
@@ -43,10 +37,8 @@ export default function VideoModal({
   onClose,
 }: VideoModalProps) {
   const [token, setToken] = useState("");
+  const [isMinimized, setIsMinimized] = useState(false);
   const getToken = useAction(api.livekit.generateToken);
-
-  // 4. 使用 Ref 来存储“我是否是最后一个人”的状态
-  // 默认为 true (假设只有我一个人)，一旦检测到有人，RoomTracker 会把它改成 false
   const isLastParticipantRef = useRef(true);
 
   useEffect(() => {
@@ -55,43 +47,73 @@ export default function VideoModal({
         const t = await getToken({ room: roomName, username: userName });
         setToken(t);
       } catch (e) {
-        console.error("无法获取 Token:", e);
+        console.error(e);
       }
     })();
   }, [roomName, userName, getToken]);
 
-  if (!token) {
+  if (!token)
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-black text-white">
-        <p>Joining call...</p>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 text-white">
+        Joining...
       </div>
     );
-  }
 
   return (
-    <LiveKitRoom
-      video={true}
-      audio={true}
-      token={token}
-      serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
-      data-lk-theme="default"
-      style={{
-        height: "100vh",
-        width: "100vw",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        zIndex: 50,
-      }}
-      // 5. 挂断时的回调
-      onDisconnected={() => {
-        // 把 Ref 里的值传回给父组件
-        onClose(isLastParticipantRef.current);
-      }}
+    <div
+      className={cn(
+        "fixed z-[100] transition-all duration-300 ease-in-out overflow-hidden bg-background shadow-2xl border",
+        isMinimized
+          ? "bottom-20 right-4 w-[320px] h-[180px] rounded-xl sm:bottom-24 sm:right-8 sm:w-[400px] sm:h-[225px]"
+          : "inset-0 w-full h-full"
+      )}
     >
-      <VideoConference />
-      {/* 6. 放入我们的追踪器 */}
-      <RoomTracker onLeaveRef={isLastParticipantRef} />
-    </LiveKitRoom>
+      <LiveKitRoom
+        video={true}
+        audio={true}
+        token={token}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
+        data-lk-theme="default"
+        onDisconnected={() => onClose(isLastParticipantRef.current)}
+        className="h-full w-full relative"
+      >
+        <div className="absolute top-2 right-2 z-[101] flex items-center gap-2">
+          <Button
+            size="iconSm"
+            variant="ghost"
+            className="bg-black/20 hover:bg-black/40 text-white backdrop-blur-md rounded-full"
+            onClick={() => setIsMinimized(!isMinimized)}
+          >
+            {isMinimized ? (
+              <Maximize2 className="size-4" />
+            ) : (
+              <Minimize2 className="size-4" />
+            )}
+          </Button>
+          {isMinimized && (
+            <Button
+              size="iconSm"
+              variant="destructive"
+              className="rounded-full"
+              onClick={() => onClose(isLastParticipantRef.current)}
+            >
+              <X className="size-4" />
+            </Button>
+          )}
+        </div>
+
+        {/* 使用 Tailwind 强制隐藏内部的控制条 */}
+        <div
+          className={cn(
+            "h-full w-full",
+            isMinimized && "[&_.lk-control-bar]:hidden"
+          )}
+        >
+          <VideoConference />
+        </div>
+
+        <RoomTracker onLeaveRef={isLastParticipantRef} />
+      </LiveKitRoom>
+    </div>
   );
 }
