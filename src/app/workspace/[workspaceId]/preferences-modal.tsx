@@ -101,7 +101,7 @@ export const PreferencesModal = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="p-6 flex flex-col gap-y-6">
+          <div className="p-6 flex flex-col gap-y-3">
             <Dialog open={eidtOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
                 <div className="px-5 py-4 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50">

@@ -157,7 +157,7 @@ export const Profile = ({ memberId, onClose }: ProfileProps) => {
         <div className="flex-1 overflow-y-auto">
           <div className="flex flex-col items-center justify-center p-8 bg-white pb-4">
             <div className="relative">
-              <Avatar className="max-w-[512px] max-h-[512px] size-full border-0 border-white shadow-lg">
+              <Avatar className="size-36 border-0 border-white shadow-lg">
                 <AvatarImage src={member.user.image} className="object-cover" />
                 <AvatarFallback className="aspect-square text-6xl bg-sky-500 text-white">
                   {avatarFallBack}
