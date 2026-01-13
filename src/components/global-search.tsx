@@ -28,6 +28,9 @@ import {
   User,
 } from "lucide-react";
 
+import { useConvex } from "convex/react"; // 👈 新增
+import { api } from "../../convex/_generated/api"; // 👈 新增
+
 // 🔥 安全初始化
 const appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID;
 const apiKey = process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY;
@@ -120,9 +123,11 @@ export const Search = ({ open, setOpen }: SearchProps) => {
   const router = useRouter();
   const workspaceId = useWorkspaceId();
 
+  const convex = useConvex();
+
   if (!searchClient) return null;
 
-  const handleSelect = (hit: any) => {
+  const handleSelect = async (hit: any) => {
     setOpen(false);
 
     if (hit.parentMessageId && hit.channelId) {
@@ -137,10 +142,23 @@ export const Search = ({ open, setOpen }: SearchProps) => {
       );
       return;
     }
+    // 私聊跳转逻辑
     if (hit.conversationId) {
-      router.push(
-        `/workspace/${workspaceId}/member/${hit.conversationId}?messageId=${hit.objectID}`
+      // 1. 去后端查对方的 Member ID
+      const otherMemberId = await convex.query(
+        api.conversations.getOtherMember,
+        {
+          conversationId: hit.conversationId,
+        }
       );
+
+      // 2. 用查到的 Member ID 跳转
+      if (otherMemberId) {
+        setOpen(false);
+        router.push(
+          `/workspace/${workspaceId}/member/${otherMemberId}?messageId=${hit.objectID}`
+        );
+      }
       return;
     }
   };

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { auth } from "./auth";
 
 export const createOrGet = mutation({
@@ -100,5 +100,43 @@ export const markAsRead = mutation({
         lastReadAt: Date.now(),
       });
     }
+  },
+});
+
+// 🔥 新增：通过 conversationId 获取对方的 memberId
+export const getOtherMember = query({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      return null;
+    }
+
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) {
+      return null;
+    }
+
+    // 获取当前用户的 Member 信息
+    const currentMember = await ctx.db
+      .query("members")
+      .withIndex("by_workspace_id_user_id", (q) =>
+        q.eq("workspaceId", conversation.workspaceId).eq("userId", userId)
+      )
+      .unique();
+
+    if (!currentMember) {
+      return null;
+    }
+
+    // 判断哪一个是“对方”
+    const otherMemberId =
+      conversation.memberOneId === currentMember._id
+        ? conversation.memberTwoId
+        : conversation.memberOneId;
+
+    return otherMemberId;
   },
 });
