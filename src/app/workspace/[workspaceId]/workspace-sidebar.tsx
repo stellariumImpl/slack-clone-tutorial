@@ -97,7 +97,9 @@ export const WorkspaceSidebar = ({
       )}
     >
       {/* 🔥 4. 条件渲染：如果是手机端 (!isPhone)，则不渲染 Search 弹窗 */}
-      {!isPhone && <Search open={searchOpen} setOpen={setSearchOpen} />}
+      {/* {!isPhone && <Search open={searchOpen} setOpen={setSearchOpen} />} */}
+
+      <Search open={searchOpen} setOpen={setSearchOpen} />
 
       <WorkspaceHeader
         workspace={workspace}

@@ -90,7 +90,7 @@ export const WorkspaceHeader = ({
 
         <div className="flex items-center gap-0.5">
           {/* 🔥 只保留这个 Filter 按钮，但功能是打开 Search */}
-          {!isPhone && (
+          {/* {!isPhone && (
             <Hint label="Filter" side="bottom">
               <Button
                 variant="transparent"
@@ -100,7 +100,13 @@ export const WorkspaceHeader = ({
                 <ListFilter className="size-4" />
               </Button>
             </Hint>
-          )}
+          )} */}
+
+          <Hint label="Filter" side="bottom">
+            <Button variant="transparent" size="iconSm" onClick={onSearchClick}>
+              <ListFilter className="size-4" />
+            </Button>
+          </Hint>
 
           {/* SquarePen 按钮已删除 */}
         </div>
