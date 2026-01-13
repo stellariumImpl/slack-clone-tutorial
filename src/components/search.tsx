@@ -84,7 +84,7 @@ export const Search = ({ open, setOpen }: SearchProps) => {
               key={member._id}
               onSelect={() => onSelectMember(member._id)}
             >
-              <span>{member.user.name}</span>
+              <span>{member.user?.name}</span>
             </CommandItem>
           ))}
         </CommandGroup>
