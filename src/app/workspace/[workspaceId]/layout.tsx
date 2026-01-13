@@ -21,6 +21,9 @@ import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { useCurrentMember } from "@/features/members/api/use-current-member";
 import { MobileNavbar } from "./mobile-navbar";
 
+// 🗑️ 删除引用
+// import { IncomingCallListener } from "@/components/incoming-call-listener";
+
 interface WorkspaceIdLayoutProps {
   children: React.ReactNode;
 }
@@ -50,24 +53,20 @@ const WorkspaceIdLayout = ({ children }: WorkspaceIdLayoutProps) => {
   }
 
   return (
-    // 🔥 修改 1: 使用 100dvh (动态视口高度) 解决手机地址栏问题
-    // overflow-hidden 禁止出现 body 级别的滚动条
     <div className="h-[100dvh] flex flex-col overflow-hidden">
-      {/* 顶部导航区域：它们有固定高度，不用动 */}
+      {/* 🗑️ 删除组件调用 */}
+      {/* <IncomingCallListener /> */}
+
       <MobileNavbar />
       <div className="hidden md:block">
         <Toolbar />
       </div>
 
-      {/* 🔥 修改 2: 使用 flex-1 自动填满剩余空间 */}
-      {/* min-h-0 是 Flex 布局中让内部滚动条生效的关键 */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Sidebar */}
         <div className="hidden md:flex h-full w-[60px] shrink-0 flex-col">
           <Sidebar />
         </div>
 
-        {/* 桌面端 Resizable 面板 */}
         <div className="hidden md:flex h-full w-full">
           <ResizablePanelGroup
             direction="horizontal"
@@ -82,7 +81,6 @@ const WorkspaceIdLayout = ({ children }: WorkspaceIdLayoutProps) => {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel minSize={20} defaultSize={80}>
-              {/* children 容器通常不需要再 flex-1，因为 Panel 会控制大小 */}
               {children}
             </ResizablePanel>
             {showPanel && (
@@ -110,7 +108,6 @@ const WorkspaceIdLayout = ({ children }: WorkspaceIdLayoutProps) => {
           </ResizablePanelGroup>
         </div>
 
-        {/* 手机端布局 */}
         <div className="md:hidden flex-1 flex flex-col h-full overflow-hidden w-full">
           {showPanel ? (
             <div className="h-full w-full absolute inset-0 z-50 bg-white">
@@ -127,7 +124,6 @@ const WorkspaceIdLayout = ({ children }: WorkspaceIdLayoutProps) => {
               ) : null}
             </div>
           ) : (
-            // children (主聊天区)
             children
           )}
         </div>

@@ -1,4 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
+// ✅ 正确：引入你项目中封装好样式的组件
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ConversationHeroProps {
   name?: string;

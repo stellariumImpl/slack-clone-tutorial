@@ -10,7 +10,7 @@ import { ChatInput } from "./chat-input";
 import { MessageList } from "@/components/message-list";
 
 // 🔥 1. 引入视频通话所需的依赖
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../convex/_generated/dataModel";
@@ -23,6 +23,16 @@ import VideoModal from "@/components/VideoModal"; // 确保路径正确
 const ChannelIdPage = () => {
   const channelId = useChannelId();
   const workspaceId = useWorkspaceId();
+
+  // 🔥 2. 新增：标记已读的 Mutation
+  // 直接赋值即可，不要解构
+  const markAsRead = useMutation(api.channels.markAsRead);
+  // 🔥 3. 新增：核心修复 - 当进入频道或频道切换时，告诉后端“已读”
+  useEffect(() => {
+    if (channelId) {
+      markAsRead({ channelId, workspaceId });
+    }
+  }, [channelId, workspaceId, markAsRead]);
 
   const { results, status, loadMore } = useGetMessages({
     channelId,

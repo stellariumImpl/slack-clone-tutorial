@@ -625,3 +625,74 @@ export const getThreads = query({
     };
   },
 });
+
+// 🔥 4. 新增：获取当前正在进行的来电 (用于全局弹窗)
+export const getIncomingCalls = query({
+  args: {
+    workspaceId: v.id("workspaces"), // 限制范围在当前工作区
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) return [];
+
+    // 1. 获取我在当前工作区的身份
+    const currentMember = await ctx.db
+      .query("members")
+      .withIndex("by_workspace_id_user_id", (q) =>
+        q.eq("workspaceId", args.workspaceId).eq("userId", userId)
+      )
+      .unique();
+
+    if (!currentMember) return [];
+
+    // 2. 查找所有“正在进行”的通话 (type="call" 且没有 callDuration)
+    // 我们可以先查最近的活跃通话
+    // 注意：这里没有完美的索引，但活跃通话通常很少，filter 效率可以接受
+    const activeCalls = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_id", (q) =>
+        q.eq("workspaceId", args.workspaceId)
+      )
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("type"), "call"),
+          q.eq(q.field("callDuration"), undefined) // 未结束
+        )
+      )
+      .order("desc")
+      .take(10);
+
+    const myCalls = [];
+
+    for (const call of activeCalls) {
+      // 我们只关心私聊的来电 (频道通话通常不需要弹窗，只需要侧边栏亮起)
+      if (call.conversationId) {
+        const conversation = await ctx.db.get(call.conversationId);
+        if (!conversation) continue;
+
+        // 3. 检查我是否是该私聊的参与者
+        const isParticipant =
+          conversation.memberOneId === currentMember._id ||
+          conversation.memberTwoId === currentMember._id;
+
+        // 4. 只有当我是参与者，且发起人不是我时，才算“来电”
+        if (isParticipant && call.memberId !== currentMember._id) {
+          // 获取发起人信息，用于弹窗显示名字头像
+          const callerMember = await ctx.db.get(call.memberId);
+          const callerUser = callerMember
+            ? await ctx.db.get(callerMember.userId)
+            : null;
+
+          myCalls.push({
+            ...call,
+            senderName: callerUser?.name || "Unknown Member",
+            senderImage: callerUser?.image,
+            senderId: call.memberId,
+          });
+        }
+      }
+    }
+
+    return myCalls;
+  },
+});

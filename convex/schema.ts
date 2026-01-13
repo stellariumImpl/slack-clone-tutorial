@@ -106,6 +106,19 @@ const schema = defineSchema({
     .index("by_workspace_member", ["workspaceId", "memberId"])
     // 🔥 新增：为了快速查找 "我在这个私聊里的草稿"
     .index("by_user_conversation", ["memberId", "conversationId"]),
+
+  // 🔥 1. 新增：记录用户阅读进度的表
+  message_reads: defineTable({
+    workspaceId: v.id("workspaces"),
+    memberId: v.id("members"),
+    channelId: v.optional(v.id("channels")), // 记录频道的已读
+    conversationId: v.optional(v.id("conversations")), // 记录私聊的已读
+    parentMessageId: v.optional(v.id("messages")), // (可选) 记录 Thread 的已读
+    lastReadAt: v.number(), // 最后阅读时间戳
+  })
+    .index("by_member_id", ["memberId"])
+    .index("by_member_id_channel_id", ["memberId", "channelId"])
+    .index("by_member_id_conversation_id", ["memberId", "conversationId"]),
 });
 
 export default schema;

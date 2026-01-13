@@ -40,12 +40,12 @@ export const getById = query({
 });
 
 export const get = query({
-  args: { workspaceId: v.id("workspaces") },
+  args: {
+    workspaceId: v.id("workspaces"),
+  },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
-    if (!userId) {
-      return [];
-    }
+    if (!userId) return [];
 
     const member = await ctx.db
       .query("members")
@@ -54,26 +54,87 @@ export const get = query({
       )
       .unique();
 
-    if (!member) {
-      return [];
-    }
+    if (!member) return [];
 
     const data = await ctx.db
       .query("members")
-      .withIndex("by_workspace_id_user_id", (q) =>
+      .withIndex("by_workspace_id", (q) =>
         q.eq("workspaceId", args.workspaceId)
       )
       .collect();
-    const members = [];
 
-    for (const member of data) {
-      const user = await populateUser(ctx, member.userId);
-      if (user) {
-        members.push({ ...member, user });
-      }
-    }
+    // 🔥 核心修改：并发查询每个成员的未读状态
+    const membersWithStatus = await Promise.all(
+      data.map(async (otherMember) => {
+        const user = await populateUser(ctx, otherMember.userId); // 假设你有这个辅助函数，如果没有请保留原逻辑
 
-    return members;
+        // 1. 查找我和这个人之间的私聊
+        const conversation = await ctx.db
+          .query("conversations")
+          .filter((q) => q.eq(q.field("workspaceId"), args.workspaceId))
+          .filter((q) =>
+            q.or(
+              q.and(
+                q.eq(q.field("memberOneId"), member._id),
+                q.eq(q.field("memberTwoId"), otherMember._id)
+              ),
+              q.and(
+                q.eq(q.field("memberOneId"), otherMember._id),
+                q.eq(q.field("memberTwoId"), member._id)
+              )
+            )
+          )
+          .first();
+
+        let hasAlert = false;
+        let isVideoActive = false;
+
+        if (conversation) {
+          // 2. 查该私聊最新消息
+          const lastMessage = await ctx.db
+            .query("messages")
+            .withIndex("by_conversation_id", (q) =>
+              q.eq("conversationId", conversation._id)
+            )
+            .order("desc")
+            .first();
+
+          // 3. 查我的阅读记录
+          const readRecord = await ctx.db
+            .query("message_reads")
+            .withIndex("by_member_id_conversation_id", (q) =>
+              q
+                .eq("memberId", member._id)
+                .eq("conversationId", conversation._id)
+            )
+            .first();
+
+          const lastReadTime = readRecord ? readRecord.lastReadAt : 0;
+
+          // 4. 计算状态
+          if (
+            lastMessage &&
+            lastMessage.memberId !== member._id &&
+            lastMessage._creationTime > lastReadTime
+          ) {
+            hasAlert = true;
+          }
+
+          if (lastMessage?.type === "call" && !lastMessage.callDuration) {
+            isVideoActive = true;
+          }
+        }
+
+        return {
+          ...otherMember,
+          user,
+          hasAlert, // 返回给前端
+          isVideoActive, // 返回给前端
+        };
+      })
+    );
+
+    return membersWithStatus;
   },
 });
 

@@ -9,7 +9,12 @@ import { Id } from "../../../../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { Conversation } from "./conversation";
 import { useRouter } from "next/navigation";
-import { useGetMember } from "@/features/members/api/use-get-member"; // 🔥 1. 引入这个实时查询 Hook
+import { useGetMember } from "@/features/members/api/use-get-member";
+import { useMutation } from "convex/react";
+import { api } from "../../../../../../convex/_generated/api";
+
+// 🔥 1. 引入获取消息的 Hook (复用 Channel 里的那个 Hook)
+import { useGetMessages } from "@/features/messages/api/use-get-messages";
 
 const MemberIdPage = () => {
   const router = useRouter();
@@ -19,38 +24,33 @@ const MemberIdPage = () => {
   const [conversationId, setConversationId] =
     useState<Id<"conversations"> | null>(null);
 
-  // 现有逻辑：用于获取会话ID (只跑一次)
   const { mutate, isPending } = useCreateOrGetConversations();
+  const markAsRead = useMutation(api.conversations.markAsRead);
 
-  // 🔥 2. 新增逻辑：实时监听成员状态
-  // useQuery 是响应式的，如果对方 Leave 了，这里的 member 会瞬间变成 null
   const { data: member, isLoading: memberLoading } = useGetMember({
     id: memberId,
   });
 
-  // 🔥 3. 新增副作用：一旦发现 member 没了，立刻跳转
+  // 🔥 2. 获取该会话的消息 (Convex 会自动订阅更新)
+  // 即使 Conversation 组件里也在请求，Convex 客户端会进行去重，所以性能影响很小
+  const { results } = useGetMessages({
+    conversationId: conversationId === null ? undefined : conversationId,
+  });
+
   useEffect(() => {
     if (memberLoading) return;
-
     if (!member) {
       toast.error("Member no longer exists");
       router.push(`/workspace/${workspaceId}`);
     }
   }, [member, memberLoading, workspaceId, router]);
 
-  // 现有逻辑：初始化会话
   useEffect(() => {
     mutate(
-      {
-        workspaceId,
-        memberId,
-      },
+      { workspaceId, memberId },
       {
         onSuccess(data) {
-          // 如果这里返回 null，说明一开始就不存在，也跳走
           if (!data) {
-            // 这里的 toast 和上面的可能会重复，可以注释掉或者保留双重保险
-            // toast.error("Member no longer exists");
             router.push(`/workspace/${workspaceId}`);
             return;
           }
@@ -65,7 +65,19 @@ const MemberIdPage = () => {
     );
   }, [memberId, workspaceId, mutate, router]);
 
-  // Loading 状态合并：不仅要等 mutation，还要等 member查询
+  // 🔥 3. 核心修复：依赖项加入 results?.[0]?._id
+  // 逻辑：每当“最新一条消息”的ID发生变化（即有新消息进来），且我仍在这个页面，就标记为已读
+  useEffect(() => {
+    if (conversationId) {
+      markAsRead({ conversationId, workspaceId });
+    }
+  }, [
+    conversationId,
+    workspaceId,
+    markAsRead,
+    results?.[0]?._id, // 👈 监听最新消息变化
+  ]);
+
   if (isPending || memberLoading) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#5d33a8]">
