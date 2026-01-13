@@ -18,12 +18,15 @@ interface WorkspaceHeaderProps {
   workspace: Doc<"workspaces">;
   isAdmin: boolean;
   onSearchClick: () => void; // 🔥 只保留这一个回调
+  // 🔥 1. 新增 isPhone 属性
+  isPhone?: boolean;
 }
 
 export const WorkspaceHeader = ({
   workspace,
   isAdmin,
   onSearchClick,
+  isPhone,
 }: WorkspaceHeaderProps) => {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -87,11 +90,17 @@ export const WorkspaceHeader = ({
 
         <div className="flex items-center gap-0.5">
           {/* 🔥 只保留这个 Filter 按钮，但功能是打开 Search */}
-          <Hint label="Filter" side="bottom">
-            <Button variant="transparent" size="iconSm" onClick={onSearchClick}>
-              <ListFilter className="size-4" />
-            </Button>
-          </Hint>
+          {!isPhone && (
+            <Hint label="Filter" side="bottom">
+              <Button
+                variant="transparent"
+                size="iconSm"
+                onClick={onSearchClick}
+              >
+                <ListFilter className="size-4" />
+              </Button>
+            </Hint>
+          )}
 
           {/* SquarePen 按钮已删除 */}
         </div>

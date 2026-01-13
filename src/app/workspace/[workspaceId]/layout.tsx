@@ -16,9 +16,10 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import { Thread } from "@/features/messages/components/thread";
 import { Profile } from "@/features/members/components/profile";
 
-import { useRouter } from "next/navigation"; // 🔥 新增
-import { useWorkspaceId } from "@/hooks/use-workspace-id"; // 🔥 新增
-import { useCurrentMember } from "@/features/members/api/use-current-member"; // 🔥 新增
+import { useRouter } from "next/navigation";
+import { useWorkspaceId } from "@/hooks/use-workspace-id";
+import { useCurrentMember } from "@/features/members/api/use-current-member";
+import { MobileNavbar } from "./mobile-navbar";
 
 interface WorkspaceIdLayoutProps {
   children: React.ReactNode;
@@ -29,21 +30,17 @@ const WorkspaceIdLayout = ({ children }: WorkspaceIdLayoutProps) => {
   const workspaceId = useWorkspaceId();
 
   const { parentMessageId, profileMemberId, onCloseMessage } = usePanel();
-  // 🔥 核心逻辑：获取当前成员身份
   const { data: member, isLoading: memberLoading } = useCurrentMember({
     workspaceId,
   });
   const showPanel = !!parentMessageId || !!profileMemberId;
-  // 🔥 核心逻辑：受害者自动跳转
-  // 如果加载完成了，但找不到 member 信息，说明被移除了 -> 踢回首页
+
   useEffect(() => {
     if (!memberLoading && !member) {
       router.push("/");
     }
   }, [memberLoading, member, router]);
 
-  // 如果正在加载，或者是被移除状态（正在等待跳转），显示 Loading 遮罩
-  // 这样用户就看不到那个紫色的错误页面了
   if (memberLoading || !member) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -51,49 +48,89 @@ const WorkspaceIdLayout = ({ children }: WorkspaceIdLayoutProps) => {
       </div>
     );
   }
+
   return (
-    <div className="h-full">
-      <Toolbar />
-      <div className="flex h-[calc(100vh-52px)]">
-        <Sidebar />
-        <ResizablePanelGroup
-          direction="horizontal"
-          autoSaveId="felix-workspace-layout"
-        >
-          <ResizablePanel
-            defaultSize={20}
-            minSize={20}
-            className="bg-[#8364bd]"
+    // 🔥 修改 1: 使用 100dvh (动态视口高度) 解决手机地址栏问题
+    // overflow-hidden 禁止出现 body 级别的滚动条
+    <div className="h-[100dvh] flex flex-col overflow-hidden">
+      {/* 顶部导航区域：它们有固定高度，不用动 */}
+      <MobileNavbar />
+      <div className="hidden md:block">
+        <Toolbar />
+      </div>
+
+      {/* 🔥 修改 2: 使用 flex-1 自动填满剩余空间 */}
+      {/* min-h-0 是 Flex 布局中让内部滚动条生效的关键 */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Sidebar */}
+        <div className="hidden md:flex h-full w-[60px] shrink-0 flex-col">
+          <Sidebar />
+        </div>
+
+        {/* 桌面端 Resizable 面板 */}
+        <div className="hidden md:flex h-full w-full">
+          <ResizablePanelGroup
+            direction="horizontal"
+            autoSaveId="felix-workspace-layout"
           >
-            <WorkspaceSidebar />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel minSize={20} defaultSize={80}>
-            {children}
-          </ResizablePanel>
-          {showPanel && (
-            <>
-              <ResizableHandle withHandle />
-              <ResizablePanel minSize={20} defaultSize={29}>
-                {parentMessageId ? (
-                  <Thread
-                    messageId={parentMessageId as Id<"messages">}
-                    onCloseMessage={onCloseMessage}
-                  />
-                ) : profileMemberId ? (
-                  <Profile
-                    memberId={profileMemberId as Id<"members">}
-                    onClose={onCloseMessage} // 这里之前笔误了，也懒得改了
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <Loader className="size-5 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-              </ResizablePanel>
-            </>
+            <ResizablePanel
+              defaultSize={20}
+              minSize={20}
+              className="bg-[#8364bd]"
+            >
+              <WorkspaceSidebar />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel minSize={20} defaultSize={80}>
+              {/* children 容器通常不需要再 flex-1，因为 Panel 会控制大小 */}
+              {children}
+            </ResizablePanel>
+            {showPanel && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel minSize={20} defaultSize={29}>
+                  {parentMessageId ? (
+                    <Thread
+                      messageId={parentMessageId as Id<"messages">}
+                      onCloseMessage={onCloseMessage}
+                    />
+                  ) : profileMemberId ? (
+                    <Profile
+                      memberId={profileMemberId as Id<"members">}
+                      onClose={onCloseMessage}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <Loader className="size-5 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        </div>
+
+        {/* 手机端布局 */}
+        <div className="md:hidden flex-1 flex flex-col h-full overflow-hidden w-full">
+          {showPanel ? (
+            <div className="h-full w-full absolute inset-0 z-50 bg-white">
+              {parentMessageId ? (
+                <Thread
+                  messageId={parentMessageId as Id<"messages">}
+                  onCloseMessage={onCloseMessage}
+                />
+              ) : profileMemberId ? (
+                <Profile
+                  memberId={profileMemberId as Id<"members">}
+                  onClose={onCloseMessage}
+                />
+              ) : null}
+            </div>
+          ) : (
+            // children (主聊天区)
+            children
           )}
-        </ResizablePanelGroup>
+        </div>
       </div>
     </div>
   );

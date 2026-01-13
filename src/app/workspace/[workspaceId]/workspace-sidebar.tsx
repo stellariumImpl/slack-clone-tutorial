@@ -1,3 +1,5 @@
+"use client";
+
 import { useWorkspaceId } from "@/hooks/use-workspace-id";
 import { useChannelId } from "@/hooks/use-channel-id";
 import { useMemberId } from "@/hooks/use-member-id";
@@ -25,7 +27,19 @@ import { UserItem } from "./user-item";
 // 引入全局搜索组件
 import { Search } from "@/components/search";
 
-export const WorkspaceSidebar = () => {
+import { cn } from "@/lib/utils";
+
+interface WorkspaceSidebarProps {
+  className?: string;
+  // 🔥 1. 新增 props 定义
+  isPhone?: boolean;
+}
+
+// 🔥 2. 解构 isPhone
+export const WorkspaceSidebar = ({
+  className,
+  isPhone,
+}: WorkspaceSidebarProps) => {
   const pathname = usePathname();
   const memberId = useMemberId();
   const channelId = useChannelId();
@@ -33,7 +47,6 @@ export const WorkspaceSidebar = () => {
 
   const [_open, setOpen] = useCreateChannelModal();
 
-  // 🔥 1. 只保留 Search 弹窗状态，删除了 Sidebar 本地的 filter 状态
   const [searchOpen, setSearchOpen] = useState(false);
 
   const { data: member, isLoading: memberLoading } = useCurrentMember({
@@ -53,7 +66,6 @@ export const WorkspaceSidebar = () => {
 
   const isLoading = memberLoading || workspaceLoading;
 
-  // 保持颜色 #8364bd
   if (isLoading) {
     return (
       <div className="flex flex-col bg-[#8364bd] h-full items-center justify-center">
@@ -64,7 +76,6 @@ export const WorkspaceSidebar = () => {
 
   const isUnauthorized = !workspace || !member;
 
-  // 保持颜色 #8364bd
   if (isUnauthorized) {
     return (
       <div className="flex flex-col gap-y-2 bg-[#8364bd] h-full items-center justify-center">
@@ -75,19 +86,26 @@ export const WorkspaceSidebar = () => {
   }
 
   return (
-    // 保持颜色 #8364bd
-    <div className="flex flex-col bg-[#8364bd] h-full">
-      {/* 弹窗组件 */}
-      <Search open={searchOpen} setOpen={setSearchOpen} />
+    // 🔥 3. 样式修改：
+    // a. 使用 cn() 允许外部传入 className
+    // b. 如果 isPhone 为 true，强制添加 border-none 去掉白边
+    <div
+      className={cn(
+        "flex flex-col bg-[#8364bd] h-full",
+        className,
+        isPhone && "border-none"
+      )}
+    >
+      {/* 🔥 4. 条件渲染：如果是手机端 (!isPhone)，则不渲染 Search 弹窗 */}
+      {!isPhone && <Search open={searchOpen} setOpen={setSearchOpen} />}
 
       <WorkspaceHeader
         workspace={workspace}
         isAdmin={member.role === "admin"}
-        // 🔥 点击 Filter 按钮 -> 打开 Search 弹窗
         onSearchClick={() => setSearchOpen(true)}
+        // 🔥 核心修改：把 isPhone 传给 Header
+        isPhone={isPhone}
       />
-
-      {/* 🔥 这里删除了之前的 Input 输入框 */}
 
       <div className="flex flex-col px-2 mt-3">
         <SidebarItem
@@ -109,7 +127,6 @@ export const WorkspaceSidebar = () => {
         hint="New channel"
         onNew={member.role === "admin" ? () => setOpen(true) : undefined}
       >
-        {/* 🔥 直接渲染 channels，不再需要 filter */}
         {channels?.map((item) => (
           <SidebarItem
             key={item._id}
@@ -121,13 +138,7 @@ export const WorkspaceSidebar = () => {
         ))}
       </WorkspaceSection>
 
-      <WorkspaceSection
-        label="Direct Messages"
-        hint="New direct message"
-        // 点击加号也可以打开搜索弹窗，方便用户
-        // onNew={() => setSearchOpen(true)}
-      >
-        {/* 🔥 直接渲染 members */}
+      <WorkspaceSection label="Direct Messages" hint="New direct message">
         {members?.map((item) => (
           <UserItem
             key={item._id}
