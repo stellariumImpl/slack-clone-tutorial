@@ -31,7 +31,7 @@ export const InviteModal = ({
   const { mutate, isPending } = useNewJoinCode();
 
   // === 原有逻辑保持不变 ===
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(60);
   const [isManualLoading, setIsManualLoading] = useState(false);
   const [clickCount, setClickCount] = useState(0);
   const [isRateLimited, setIsRateLimited] = useState(false);
