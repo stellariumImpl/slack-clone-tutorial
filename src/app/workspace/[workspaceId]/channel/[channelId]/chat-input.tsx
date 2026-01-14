@@ -27,7 +27,6 @@ type CreateMessageValues = {
 export const ChatInput = ({ placeholder }: ChatInputProps) => {
   // 1. editorKey: 用来“刷新”编辑器的。
   // 当 key 变化时，React 会重新创建组件，从而清空输入框内容。
-  const [editorKey, setEditorKey] = useState(0);
 
   // 2. isPending: 用来控制“正在发送”的状态。
   // 发送时变为 true，编辑器会变灰（不可用）。
@@ -105,8 +104,6 @@ export const ChatInput = ({ placeholder }: ChatInputProps) => {
 
       // 4. 发送消息 (使用准备好的 values)
       await createMessage(values, { throwError: true });
-
-      setEditorKey((prevKey) => prevKey + 1);
     } catch (error) {
       //   console.log(error);
       toast.error("Failed to send message");
@@ -118,7 +115,7 @@ export const ChatInput = ({ placeholder }: ChatInputProps) => {
   return (
     <div className="px-5 w-full">
       <Editor
-        key={editorKey} // 关键：key 变了，组件就重置了
+        key={channelId}
         placeholder={placeholder}
         onSubmit={handleSubmit} // 绑定上面的模拟发送函数
         disabled={isPending} // 发送中禁用
