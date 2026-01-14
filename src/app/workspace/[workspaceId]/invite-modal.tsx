@@ -59,7 +59,7 @@ export const InviteModal = ({
               },
             }
           );
-          return 30;
+          return 60;
         }
         return prev - 1;
       });
@@ -119,7 +119,7 @@ export const InviteModal = ({
       {
         onSuccess: () => {
           toast.success("New join code generated");
-          setTimeLeft(30);
+          setTimeLeft(60);
         },
         onError: () => {
           toast.error("Failed to generate new join code");
