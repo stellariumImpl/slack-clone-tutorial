@@ -51,7 +51,7 @@ interface MessageProps {
   threadTimestamp?: number;
 
   // 2. 【新增】接收类型和时长
-  type?: "text" | "call";
+  type?: "text" | "call" | "call_join" | "call_leave";
   callDuration?: number;
 }
 
