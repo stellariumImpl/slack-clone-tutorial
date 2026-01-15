@@ -181,7 +181,7 @@ export const Message = ({
         </div>
         <div className="flex flex-col">
           <span className="font-semibold text-sm">
-            {isEnded ? "Video call ended" : "Video call started"}
+            {isEnded ? "Video call ended" : "Join the video call"}
           </span>
           <span className="text-xs opacity-90">
             {isEnded

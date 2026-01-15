@@ -57,7 +57,14 @@ const schema = defineSchema({
     updatedAt: v.optional(v.number()),
 
     // 新增：消息类型，默认为text，通话则为call
-    type: v.optional(v.union(v.literal("text"), v.literal("call"))),
+    type: v.optional(
+      v.union(
+        v.literal("text"),
+        v.literal("call"),
+        v.literal("call_join"), // 👈 新增
+        v.literal("call_leave") // 👈 建议顺便加上，用于记录离开
+      )
+    ),
     // 新增：通话时长（ms），只有通话结束才有值
     callDuration: v.optional(v.number()),
 

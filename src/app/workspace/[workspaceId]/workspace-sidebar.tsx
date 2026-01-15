@@ -51,6 +51,7 @@ export const WorkspaceSidebar = ({
   });
   const { data: channels, isLoading: channelsLoading } = useGetChannels({
     workspaceId,
+    activeChannelId: channelId,
   });
   const { data: members, isLoading: membersLoading } = useGetMembers({
     workspaceId,

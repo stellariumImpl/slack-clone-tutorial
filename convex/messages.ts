@@ -178,10 +178,11 @@ export const update = mutation({
     }
 
     await ctx.db.patch(args.id, {
-      // body: args.body,
-      // 更新
       ...(args.body ? { body: args.body } : {}),
-      ...(args.callDuration ? { callDuration: args.callDuration } : {}),
+      // 🔥 修正：只要传了参数（即使是0），就应该更新，防止逻辑判定为 false 导致不更新
+      ...(args.callDuration !== undefined
+        ? { callDuration: args.callDuration }
+        : {}),
       updatedAt: Date.now(),
     });
 
@@ -421,7 +422,15 @@ export const create = mutation({
     parentMessageId: v.optional(v.id("messages")),
 
     // 允许前端传type
-    type: v.optional(v.union(v.literal("text"), v.literal("call"))),
+    // 🔥 这里的校验器必须与 schema.ts 保持 100% 一致
+    type: v.optional(
+      v.union(
+        v.literal("text"),
+        v.literal("call"),
+        v.literal("call_join"),
+        v.literal("call_leave")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);

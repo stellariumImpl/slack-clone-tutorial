@@ -24,6 +24,10 @@ const ChannelIdPage = () => {
   const channelId = useChannelId();
   const workspaceId = useWorkspaceId();
 
+  const { results, status, loadMore } = useGetMessages({
+    channelId,
+  });
+
   // 🔥 2. 新增：标记已读的 Mutation
   // 直接赋值即可，不要解构
   const markAsRead = useMutation(api.channels.markAsRead);
@@ -32,11 +36,9 @@ const ChannelIdPage = () => {
     if (channelId) {
       markAsRead({ channelId, workspaceId });
     }
-  }, [channelId, workspaceId, markAsRead]);
-
-  const { results, status, loadMore } = useGetMessages({
-    channelId,
-  });
+    // 💡 增加 results 作为依赖项：
+    // 每当消息列表更新（即新消息到来），如果用户在这个页面，就更新已读时间
+  }, [channelId, workspaceId, markAsRead, results?.length]);
 
   const { data: channel, isLoading: channelLoading } = useGetChannel({
     id: channelId,

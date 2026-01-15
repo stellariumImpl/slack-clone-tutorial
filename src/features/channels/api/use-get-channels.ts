@@ -6,6 +6,7 @@ import { Id } from "../../../../convex/_generated/dataModel";
 
 interface UseGetChannelsProps {
   workspaceId: Id<"workspaces">;
+  activeChannelId?: Id<"channels">; // 🔥 新增：传入当前活跃的频道ID
 }
 
 export const useGetChannels = ({ workspaceId }: UseGetChannelsProps) => {

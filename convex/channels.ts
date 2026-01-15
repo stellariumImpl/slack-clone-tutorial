@@ -160,10 +160,6 @@ export const getById = query({
   },
 });
 
-// convex/channels.ts
-
-// ... 前面的 imports 保持不变 ...
-
 // 🔥 2. 新增：标记频道为已读的 Mutation
 export const markAsRead = mutation({
   args: {
@@ -206,9 +202,12 @@ export const markAsRead = mutation({
 });
 
 // 🔥 3. 修改：get 查询，增加 hasAlert 和 isVideoActive 字段
+
 export const get = query({
   args: {
     workspaceId: v.id("workspaces"),
+    // 🔥 新增：传入当前正在查看的频道 ID
+    activeChannelId: v.optional(v.id("channels")),
   },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
@@ -230,11 +229,20 @@ export const get = query({
       )
       .collect();
 
-    // 并发查询每个频道的状态
-    const channelsWithStatus = await Promise.all(
+    return await Promise.all(
       channels.map(async (channel) => {
-        // A. 查该频道最新的一条消息
-        const lastMessage = await ctx.db
+        // 1. 获取最后阅读时间
+        const readRecord = await ctx.db
+          .query("message_reads")
+          .withIndex("by_member_id_channel_id", (q) =>
+            q.eq("memberId", member._id).eq("channelId", channel._id)
+          )
+          .first();
+        const lastReadTime = readRecord ? readRecord.lastReadAt : 0;
+
+        // 🔥 2. 精准 hasAlert：不再只看最后一条。
+        // 查询该频道是否存在：[不是我发的] 且 [创建时间 > 我最后阅读时间] 的消息
+        const unreadMessage = await ctx.db
           .query("messages")
           .withIndex("by_channel_id_parent_message_id_conversation_id", (q) =>
             q
@@ -242,39 +250,43 @@ export const get = query({
               .eq("parentMessageId", undefined)
               .eq("conversationId", undefined)
           )
-          .order("desc")
-          .first();
-
-        // B. 查用户对该频道的最后阅读时间
-        const readRecord = await ctx.db
-          .query("message_reads")
-          .withIndex("by_member_id_channel_id", (q) =>
-            q.eq("memberId", member._id).eq("channelId", channel._id)
+          .filter((q) =>
+            q.and(
+              q.gt(q.field("_creationTime"), lastReadTime),
+              q.neq(q.field("memberId"), member._id)
+            )
           )
           .first();
 
-        const lastReadTime = readRecord ? readRecord.lastReadAt : 0;
+        // 🔥 3. 精准 isVideoActive：查询是否存在活跃通话
+        // 只要该频道里有一条 type="call" 且 [没有 callDuration] 的消息，它就是活跃的
+        const activeCall = await ctx.db
+          .query("messages")
+          .withIndex("by_channel_id_parent_message_id_conversation_id", (q) =>
+            q
+              .eq("channelId", channel._id)
+              .eq("parentMessageId", undefined)
+              .eq("conversationId", undefined)
+          )
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("type"), "call"),
+              q.eq(q.field("callDuration"), undefined)
+            )
+          )
+          .first();
 
-        // C. 计算是否有未读消息
-        // 条件：有消息 && 不是我发的 && 消息时间 > 我的阅读时间
-        const hasAlert =
-          lastMessage &&
-          lastMessage.memberId !== member._id &&
-          lastMessage._creationTime > lastReadTime;
-
-        // D. 计算是否正在通话
-        // 条件：最新消息是 call 类型 && 还没有 callDuration (代表未结束)
-        const isVideoActive =
-          lastMessage?.type === "call" && !lastMessage.callDuration;
+        // 🔥 核心修改：判断是否为当前活跃频道
+        const isCurrentActive = channel._id === args.activeChannelId;
 
         return {
           ...channel,
-          hasAlert: !!hasAlert,
-          isVideoActive: !!isVideoActive,
+          // 🔥 只有当“有未读消息”且“不是当前活跃频道”时，才显示红点
+          hasAlert: !!unreadMessage && !isCurrentActive,
+          isVideoActive: !!activeCall,
+          participantCount: activeCall?.participants?.length || 0,
         };
       })
     );
-
-    return channelsWithStatus;
   },
 });
